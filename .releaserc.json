@@ -9,8 +9,8 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "node scripts/set-version.mjs \"${nextRelease.version}\" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund && npm run package:extension",
-        "publishCmd": "npm run publish:chrome"
+        "prepareCmd": "node scripts/set-version.mjs \"${nextRelease.version}\" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund && npm run package:extension && npm run build -w @datalabrotterdam/nova-ai-browser-host",
+        "publishCmd": "npm publish -w @datalabrotterdam/nova-ai-browser-host && if [ \"$PUBLISH_CHROME_EXTENSION\" = true ]; then npm run publish:chrome; else echo \"Chrome Web Store upload skipped (PUBLISH_CHROME_EXTENSION is not true)\"; fi"
       }
     ],
     [
@@ -30,14 +30,7 @@
       {
         "successComment": false,
         "failCommentCondition": false,
-        "releasedLabels": false,
-        "assets": [
-          {
-            "path": "release/nova-ai-browser-extension.zip",
-            "name": "nova-ai-browser-extension-${nextRelease.version}.zip",
-            "label": "Nova AI browser extension (Chrome Web Store package)"
-          }
-        ]
+        "releasedLabels": false
       }
     ]
   ]
