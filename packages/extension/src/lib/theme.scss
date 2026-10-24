@@ -1,0 +1,344 @@
+// Same design tokens as the nova-ai-vscode webview (webview/src/app.scss). VS Code fills those from
+// the editor theme; in the browser they follow the system light/dark setting, with values taken
+// from VS Code's Light/Dark Modern themes so both products look alike.
+:root {
+  --nova-bg: #f8f8f8;
+  --nova-fg: #3b3b3b;
+  --nova-muted: #6f6f6f;
+  --nova-border: #e5e5e5;
+  --nova-subtle-border: #e0e0e0;
+  --nova-surface: #ffffff;
+  --nova-hover: #ebebeb;
+  --nova-hover-fg: var(--nova-fg);
+  --nova-focus: #6633ee;
+  --nova-link: #5a2ad6;
+  --nova-link-active: #4a1fbf;
+  --nova-button-bg: #6633ee;
+  --nova-button-fg: #ffffff;
+  --nova-button-hover: #5a2ad6;
+  --nova-button-border: transparent;
+  --nova-secondary-bg: #e5e5e5;
+  --nova-secondary-fg: #3b3b3b;
+  --nova-secondary-hover: #cccccc;
+  --nova-input-bg: #ffffff;
+  --nova-input-fg: #3b3b3b;
+  --nova-input-border: #cecece;
+  --nova-input-placeholder: #767676;
+  --nova-code-bg: #f0f0f0;
+  --nova-request-bg: #ffffff;
+  --nova-badge-bg: #cccccc;
+  --nova-badge-fg: #3b3b3b;
+  --nova-error: #c72e2e;
+  --nova-error-bg: #fdecec;
+  --nova-error-border: #c72e2e;
+  --nova-success: #2e7d32;
+  --nova-warning: #9a6700;
+  --nova-shadow: rgba(0, 0, 0, 0.16);
+  --nova-radius: 4px;
+  --nova-radius-large: 6px;
+  --nova-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --nova-font-size: 13px;
+  --nova-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  // Nova brand colors, taken from the Nova platform; used only for decorative glows.
+  --nova-brand-primary: #6633ee;
+  --nova-brand-info: #38bdf8;
+  --nova-brand-secondary: #2ecc71;
+  --nova-brand-red: #e5484d;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --nova-bg: #181818;
+    --nova-fg: #cccccc;
+    --nova-muted: #9d9d9d;
+    --nova-border: #2b2b2b;
+    --nova-subtle-border: #313131;
+    --nova-surface: #1f1f1f;
+    --nova-hover: #2a2d2e;
+    --nova-focus: #8f6bff;
+    --nova-link: #a68bff;
+    --nova-link-active: #bba6ff;
+    --nova-button-bg: #6633ee;
+    --nova-button-fg: #ffffff;
+    --nova-button-hover: #7547ff;
+    --nova-secondary-bg: #313131;
+    --nova-secondary-fg: #cccccc;
+    --nova-secondary-hover: #3c3c3c;
+    --nova-input-bg: #313131;
+    --nova-input-fg: #cccccc;
+    --nova-input-border: #3c3c3c;
+    --nova-input-placeholder: #989898;
+    --nova-code-bg: #2b2b2b;
+    --nova-request-bg: #262626;
+    --nova-badge-bg: #616161;
+    --nova-badge-fg: #f8f8f8;
+    --nova-error: #f85149;
+    --nova-error-bg: #3a1d1d;
+    --nova-error-border: #be1100;
+    --nova-success: #2ea043;
+    --nova-warning: #cca700;
+    --nova-shadow: rgba(0, 0, 0, 0.36);
+    color-scheme: dark;
+  }
+}
+
+// High contrast: rely on strong borders and full-contrast text instead of shades (like VS Code's HC themes).
+@media (prefers-contrast: more) {
+  :root {
+    --nova-muted: var(--nova-fg);
+    --nova-border: currentColor;
+    --nova-subtle-border: currentColor;
+    --nova-input-border: currentColor;
+    --nova-button-border: currentColor;
+    --nova-surface: transparent;
+    --nova-request-bg: transparent;
+  }
+}
+
+// Windows High Contrast / forced colors: let the system palette win everywhere.
+@media (forced-colors: active) {
+  :root {
+    --nova-bg: Canvas;
+    --nova-fg: CanvasText;
+    --nova-muted: CanvasText;
+    --nova-border: CanvasText;
+    --nova-subtle-border: CanvasText;
+    --nova-surface: Canvas;
+    --nova-hover: Highlight;
+    --nova-hover-fg: HighlightText;
+    --nova-focus: Highlight;
+    --nova-link: LinkText;
+    --nova-link-active: LinkText;
+    --nova-button-bg: ButtonFace;
+    --nova-button-fg: ButtonText;
+    --nova-button-hover: Highlight;
+    --nova-button-border: ButtonText;
+    --nova-secondary-bg: ButtonFace;
+    --nova-secondary-fg: ButtonText;
+    --nova-secondary-hover: Highlight;
+    --nova-input-bg: Field;
+    --nova-input-fg: FieldText;
+    --nova-input-border: FieldText;
+    --nova-code-bg: Canvas;
+    --nova-request-bg: Canvas;
+    --nova-error: CanvasText;
+    --nova-success: CanvasText;
+    --nova-warning: CanvasText;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--nova-bg);
+  color: var(--nova-fg);
+  font-family: var(--nova-font);
+  font-size: var(--nova-font-size);
+  line-height: 1.4;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+#app {
+  height: 100%;
+}
+
+a {
+  color: var(--nova-link);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--nova-link-active);
+    text-decoration: underline;
+  }
+}
+
+:focus-visible {
+  outline: 1px solid var(--nova-focus);
+  outline-offset: -1px;
+}
+
+@media (prefers-contrast: more), (forced-colors: active) {
+  :focus-visible {
+    outline-width: 2px;
+    outline-offset: 1px;
+  }
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--nova-mono);
+  font-size: 0.95em;
+}
+
+.nova-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 26px;
+  padding: 4px 12px;
+  border: 1px solid var(--nova-button-border);
+  border-radius: var(--nova-radius);
+  background: var(--nova-button-bg);
+  color: var(--nova-button-fg);
+  font: inherit;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--nova-button-hover);
+    text-decoration: none;
+    color: var(--nova-button-fg);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  &.secondary {
+    background: var(--nova-secondary-bg);
+    color: var(--nova-secondary-fg);
+
+    &:hover:not(:disabled) {
+      background: var(--nova-secondary-hover);
+      color: var(--nova-secondary-fg);
+    }
+  }
+}
+
+.nova-input {
+  width: 100%;
+  min-height: 26px;
+  padding: 4px 6px;
+  border: 1px solid var(--nova-input-border);
+  border-radius: 2px;
+  background: var(--nova-input-bg);
+  color: var(--nova-input-fg);
+  font: inherit;
+
+  &::placeholder {
+    color: var(--nova-input-placeholder);
+  }
+
+  &:focus {
+    outline: 1px solid var(--nova-focus);
+    outline-offset: -1px;
+    border-color: var(--nova-focus);
+  }
+}
+
+select.nova-input {
+  cursor: pointer;
+}
+
+// Toolbar-style icon button (codicon inside).
+.nova-icon-button {
+  display: inline-grid;
+  place-items: center;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--nova-radius);
+  background: none;
+  color: var(--nova-fg);
+  cursor: pointer;
+
+  &:hover:not(:disabled),
+  &[aria-pressed='true'] {
+    background: var(--nova-hover);
+    color: var(--nova-hover-fg);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+// Monochrome brand marks drawn in the current text color via a mask.
+.nova-mark {
+  display: inline-block;
+  background-color: currentColor;
+  mask-image: var(--mark-url);
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+}
+
+@media (forced-colors: active) {
+  // Masks with background-color are dropped in forced colors; keep the mark visible.
+  .nova-mark {
+    forced-color-adjust: none;
+    background-color: CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// The Nova platform's "chat bar orbit": a conic gradient rotating behind the composer.
+@property --nova-glow-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes nova-orbit {
+  to {
+    --nova-glow-angle: 360deg;
+  }
+}
+
+@keyframes nova-chatbar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nova-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes nova-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--nova-brand-primary) 50%, transparent);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--nova-brand-primary) 0%, transparent);
+  }
+}

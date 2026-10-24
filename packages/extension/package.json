@@ -1,0 +1,30 @@
+{
+  "name": "@datalabrotterdam/nova-ai-browser-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chromium extension that lets Nova AI (and ACP/MCP agents) control the browser with a visible virtual cursor.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json",
+    "build:store": "vite build --mode store --outDir dist-store --emptyOutDir"
+  },
+  "dependencies": {
+    "@datalabrotterdam/nova-ai-browser-protocol": "0.1.0",
+    "@datalabrotterdam/nova-sdk": "^1.3.2",
+    "@vscode/codicons": "^0.0.46-24",
+    "dompurify": "^3.4.16",
+    "marked": "^18.1.0"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^3.0.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tsconfig/svelte": "^5.0.8",
+    "@types/chrome": "^0.3.4",
+    "sass-embedded": "^1.105.1",
+    "svelte": "^5.57.1",
+    "svelte-check": "^4.7.6",
+    "vite": "^8.3.2"
+  }
+}

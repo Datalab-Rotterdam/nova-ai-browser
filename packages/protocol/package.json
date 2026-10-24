@@ -1,0 +1,16 @@
+{
+  "name": "@datalabrotterdam/nova-ai-browser-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared tool definitions, message types and model helpers for Nova AI Browser.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@datalabrotterdam/nova-sdk": "^1.3.2"
+  }
+}

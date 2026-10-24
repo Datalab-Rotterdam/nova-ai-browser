@@ -1,0 +1,52 @@
+main {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mark {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--nova-fg);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.1em;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+h1 strong {
+  font-weight: 700;
+}
+
+.hint {
+  color: var(--nova-muted);
+}
+
+code {
+  display: block;
+  padding: 4px 6px;
+  border-radius: var(--nova-radius);
+  background: var(--nova-input-bg);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.buttons {
+  display: flex;
+  gap: 6px;
+
+  .nova-button {
+    width: auto;
+    flex: 1 1 auto;
+  }
+}

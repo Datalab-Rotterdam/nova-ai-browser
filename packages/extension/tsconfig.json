@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["chrome", "svelte", "vite/client"]
+  },
+  "include": ["src", "*.ts"]
+}

@@ -1,0 +1,367 @@
+/* Nova's presence on web pages. Lives in a closed shadow root; same brand language as the
+   side panel and nova-ai-vscode: neutral surfaces, Nova mark, brand colors only for glows. */
+:host {
+  all: initial;
+  --primary: #6633ee;
+  --info: #38bdf8;
+  --secondary: #2ecc71;
+  --red: #e5484d;
+  --pill-bg: #ffffff;
+  --pill-fg: #3b3b3b;
+  --pill-border: #e0e0e0;
+  --pill-hover: #f2f2f2;
+  --cursor-fill: #141414;
+  --cursor-stroke: #ffffff;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    --pill-bg: #1f1f1f;
+    --pill-fg: #cccccc;
+    --pill-border: #3c3c3c;
+    --pill-hover: #2a2d2e;
+  }
+}
+
+.layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483646;
+  font-family: var(--font);
+}
+
+/* Viewport edge: a slowly orbiting brand-gradient ring plus a soft inner glow. */
+.edge {
+  position: fixed;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 280ms ease;
+  box-shadow:
+    inset 0 0 18px color-mix(in srgb, var(--primary) 45%, transparent),
+    inset 0 0 42px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: 3px;
+  /* Only the 3px frame shows: the content box is cut out of the gradient. */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+.orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150vmax;
+  height: 150vmax;
+  margin: -75vmax 0 0 -75vmax;
+  background: conic-gradient(
+    from 0deg,
+    color-mix(in srgb, var(--primary) 10%, transparent) 0deg,
+    var(--primary) 55deg,
+    var(--info) 145deg,
+    var(--secondary) 220deg,
+    var(--primary) 300deg,
+    color-mix(in srgb, var(--primary) 10%, transparent) 360deg
+  );
+  animation: nova-orbit 5s linear infinite;
+}
+
+.active .edge {
+  opacity: 1;
+}
+
+@keyframes nova-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Cursor */
+.cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  will-change: transform;
+}
+
+.active .cursor {
+  opacity: 1;
+}
+
+.arrow {
+  display: block;
+  width: 20px;
+  height: 26px;
+  overflow: visible;
+  filter:
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35))
+    drop-shadow(0 0 6px color-mix(in srgb, var(--primary) 70%, transparent));
+  transform-origin: 0 0;
+  transition: transform 90ms ease;
+}
+
+.arrow path {
+  fill: var(--cursor-fill);
+  stroke: var(--cursor-stroke);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.cursor.pressed .arrow {
+  transform: scale(0.86);
+}
+
+/* Action label next to the cursor, a pill with the Nova mark. */
+.label {
+  position: absolute;
+  left: 18px;
+  top: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 340px;
+  padding: 4px 10px 4px 7px;
+  border: 1px solid var(--pill-border);
+  border-radius: 999px;
+  background: var(--pill-bg);
+  color: var(--pill-fg);
+  font: 500 12px/16px var(--font);
+  white-space: nowrap;
+  box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--primary) 45%, transparent), 0 1px 3px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.label.visible {
+  opacity: 1;
+  transform: none;
+}
+
+.label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mark {
+  display: block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+}
+
+.mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Click ripple */
+.ripple {
+  position: fixed;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  animation: nova-ripple 460ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.ripple.right {
+  border-style: dashed;
+}
+
+@keyframes nova-ripple {
+  from {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  to {
+    transform: scale(3.6);
+    opacity: 0;
+  }
+}
+
+/* Stop button, like the Nova composer: neutral surface, brand glow, red stop square. */
+.stop-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  display: flex;
+  justify-content: center;
+}
+
+.stop {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 10px;
+  border: 1px solid var(--pill-border);
+  border-radius: 14px;
+  background: var(--pill-bg);
+  color: var(--pill-fg);
+  font: 600 13px/18px var(--font);
+  cursor: pointer;
+  box-shadow: 0 6px 24px -8px color-mix(in srgb, var(--primary) 60%, transparent), 0 2px 6px rgba(0, 0, 0, 0.16);
+  opacity: 0;
+  transform: translateY(80px);
+  transition: transform 450ms cubic-bezier(0.16, 1, 0.3, 1), opacity 250ms ease, background 150ms ease;
+}
+
+.active .stop {
+  opacity: 1;
+  transform: none;
+}
+
+.stop:hover {
+  background: var(--pill-hover);
+}
+
+.stop:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.stop .mark {
+  width: 16px;
+  height: 16px;
+}
+
+.stop-square {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--red);
+}
+
+.divider {
+  width: 1px;
+  height: 14px;
+  background: var(--pill-border);
+}
+
+/* Screenshots: hide everything for one frame. */
+.capturing .cursor,
+.capturing .edge,
+.capturing .stop-wrap,
+.capturing .ripple {
+  visibility: hidden !important;
+}
+
+/* Reduced motion: no orbit, no ripple growth, no slide-ins. The cursor jumps (handled in script). */
+@media (prefers-reduced-motion: reduce) {
+  .orbit {
+    animation: none;
+  }
+
+  .ripple {
+    animation: none;
+    opacity: 0.8;
+  }
+
+  .stop,
+  .label,
+  .cursor,
+  .edge {
+    transition: none;
+  }
+}
+
+/* High contrast: solid, unanimated frame instead of glows; strong borders on pills. */
+@media (prefers-contrast: more) {
+  .edge {
+    box-shadow: none;
+  }
+
+  .orbit {
+    animation: none;
+    background: var(--primary);
+  }
+
+  .ring {
+    padding: 4px;
+  }
+
+  .label,
+  .stop {
+    border: 2px solid currentColor;
+    box-shadow: none;
+  }
+
+  .arrow {
+    filter: none;
+  }
+
+  .arrow path {
+    stroke-width: 2.2;
+  }
+}
+
+/* Windows High Contrast: system colors only. */
+@media (forced-colors: active) {
+  .layer {
+    forced-color-adjust: none;
+  }
+
+  .edge {
+    box-shadow: none;
+  }
+
+  .orbit {
+    animation: none;
+    background: Highlight;
+  }
+
+  .ring {
+    padding: 4px;
+  }
+
+  .arrow {
+    filter: none;
+  }
+
+  .arrow path {
+    fill: CanvasText;
+    stroke: Canvas;
+    stroke-width: 2.2;
+  }
+
+  .label,
+  .stop {
+    border: 2px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+  }
+
+  .stop:hover {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .stop-square {
+    background: CanvasText;
+  }
+
+  .divider {
+    background: CanvasText;
+  }
+
+  .ripple {
+    border-color: Highlight;
+    background: transparent;
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@datalabrotterdam/nova-ai-browser-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Native messaging host for Nova AI Browser: exposes the browser tools as an MCP server (stdio and HTTP) to VS Code, Claude Code and ACP agents.",
+  "bin": {
+    "nova-ai-browser-host": "dist/cli.js",
+    "nova-ai-browser-mcp": "dist/mcp.js"
+  },
+  "files": [
+    "dist",
+    "skill"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  },
+  "devDependencies": {
+    "@datalabrotterdam/nova-ai-browser-protocol": "0.1.0",
+    "@types/node": "^26.6.4",
+    "esbuild": "^0.28.2"
+  }
+}

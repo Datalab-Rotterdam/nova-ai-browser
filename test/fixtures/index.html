@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nova fixture</title>
+<style>
+  body { font: 16px system-ui, sans-serif; margin: 24px; }
+  section { margin: 18px 0; }
+  #menu { display: none; position: absolute; background: #fff; padding: 8px; border: 1px solid #999; width: 160px; }
+  #hover-zone { position: relative; }
+  #hover-zone:hover #menu { display: block; }
+  #hover-zone { display: inline-block; padding: 8px 14px; background: #eee; }
+  #drag-area { position: relative; width: 420px; height: 120px; background: #f4f4f4; border: 1px dashed #aaa; }
+  #box { position: absolute; left: 10px; top: 30px; width: 60px; height: 60px; background: #7c5cff; cursor: grab; }
+  #covered-wrap { position: relative; display: inline-block; }
+  #cover { position: absolute; inset: 0; background: rgba(0,0,0,.2); }
+  .div-button { display: inline-block; padding: 6px 12px; background: #ddd; cursor: pointer; }
+  #spacer { height: 1600px; }
+  iframe { width: 360px; height: 90px; border: 1px solid #ccc; }
+</style>
+</head>
+<body>
+<h1>Nova fixture</h1>
+
+<section>
+  <button id="increment">Increment</button>
+  <span>Count: <output id="count">0</output></span>
+</section>
+
+<section>
+  <label for="name">Your name</label>
+  <input id="name" type="text" placeholder="Name">
+  <label for="password">Password</label>
+  <input id="password" type="password" value="hunter2">
+</section>
+
+<section>
+  <label for="color">Color</label>
+  <select id="color"><option value="r">Red</option><option value="g">Green</option><option value="b">Blue</option></select>
+  <label><input id="agree" type="checkbox"> I agree</label>
+  <div class="div-button" id="div-button" onclick="this.dataset.clicked = 'yes'">Div button</div>
+</section>
+
+<section>
+  <div id="hover-zone">Hover me <div id="menu"><a href="#settings">Menu settings</a></div></div>
+</section>
+
+<section>
+  <div id="drag-area"><div id="box" aria-label="Draggable box" role="button" tabindex="0"></div></div>
+</section>
+
+<section>
+  <div id="covered-wrap"><button id="covered">Covered button</button><div id="cover"></div></div>
+</section>
+
+<section>
+  <iframe id="frame" src="frame.html" title="Inner frame"></iframe>
+</section>
+
+<section>
+  <textarea id="notes" aria-label="Notes"></textarea>
+</section>
+
+<div id="spacer"></div>
+<button id="bottom">Bottom button</button>
+
+<script>
+  let count = 0;
+  document.getElementById('increment').addEventListener('click', () => {
+    document.getElementById('count').textContent = String(++count);
+  });
+  const box = document.getElementById('box');
+  let start;
+  box.addEventListener('mousedown', (e) => { start = { x: e.clientX - box.offsetLeft, y: e.clientY - box.offsetTop }; });
+  window.addEventListener('mousemove', (e) => {
+    if (!start) return;
+    box.style.left = `${e.clientX - start.x}px`;
+    box.style.top = `${e.clientY - start.y}px`;
+  });
+  window.addEventListener('mouseup', () => { start = undefined; });
+  document.getElementById('bottom').addEventListener('click', () => { document.body.dataset.bottom = 'clicked'; });
+  document.addEventListener('keydown', (e) => { document.body.dataset.lastKey = e.key; });
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nova AI</title>
+</head>
+<body>
+<main>
+    <div class="head">
+        <span class="nova-mark mark" aria-hidden="true"></span>
+        <h1 id="title"></h1>
+    </div>
+    <p class="hint" id="explain"></p>
+    <code id="summary"></code>
+    <div class="buttons">
+        <button class="nova-button" data-decision="once">Allow</button>
+        <button class="nova-button secondary" data-decision="always">Always allow</button>
+        <button class="nova-button secondary" data-decision="deny">Deny</button>
+    </div>
+    <p class="hint" id="duration"></p>
+</main>
+<script type="module" src="./main.ts"></script>
+</body>
+</html>
