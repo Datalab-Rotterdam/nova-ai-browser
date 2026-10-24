@@ -34,6 +34,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # The install tests copy the built host (dist/).
+      - name: Build the host
+        run: npm run build -w @datalabrotterdam/nova-ai-browser-host
+
       - name: Unit tests
         run: npm test
 
