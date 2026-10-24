@@ -1,6 +1,6 @@
 {
   "name": "@datalabrotterdam/nova-ai-browser-protocol",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Shared tool definitions, message types and model helpers for Nova AI Browser.",
