@@ -12,7 +12,6 @@
     "test": "vitest run",
     "fixtures": "node test/serve-fixtures.mjs",
     "test:e2e": "npm run build && playwright test",
-    "vendor:host": "node scripts/vendor-host.mjs",
     "build:store": "npm run build:store -w @datalabrotterdam/nova-ai-browser-extension",
     "package:extension": "npm run build:store && node scripts/package-extension.mjs",
     "publish:chrome": "chrome-webstore-upload --source release/nova-ai-browser-extension.zip"

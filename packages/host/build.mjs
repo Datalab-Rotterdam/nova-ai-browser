@@ -1,5 +1,5 @@
 // Bundles the host, the MCP shim and all their dependencies into self-contained files in dist/,
-// so Nova AI for VS Code and nova-ai-cli can ship them as-is (see scripts/vendor.mjs).
+// so the npm package needs no dependencies; Nova AI for VS Code and nova-ai-cli run dist/cli.js from it.
 import { build } from 'esbuild';
 import { readFileSync } from 'node:fs';
 
