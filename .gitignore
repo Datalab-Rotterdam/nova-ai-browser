@@ -147,3 +147,19 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+
+# external
+ext
+
+# Playwright
+test-results/
+playwright-report/
+
+# Chrome Web Store build
+dist-store
+release/
+
+# OS and editor files
+.DS_Store
+.idea/
