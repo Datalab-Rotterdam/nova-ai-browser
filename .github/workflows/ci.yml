@@ -100,7 +100,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Release to Chrome Web Store
+    name: Release
     runs-on: ubuntu-latest
     needs:
       - e2e
@@ -141,6 +141,8 @@ jobs:
           CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          # The extension's store release is on hold: set the repository variable to "true" to upload again.
+          PUBLISH_CHROME_EXTENSION: ${{ vars.PUBLISH_CHROME_EXTENSION }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: npx semantic-release
