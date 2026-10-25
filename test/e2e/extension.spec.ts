@@ -98,6 +98,25 @@ test('click by ref fires a real click and shows the cursor', async () => {
     await expect(page.locator('#nova-ai-overlay-host')).toHaveCount(1);
 });
 
+test('tabs Nova is using show the Nova mark as favicon, until Nova is done', async () => {
+    const [second] = await Promise.all([
+        context.waitForEvent('page'),
+        tool('tabs_create', { url: `${base}/frame.html` })
+    ]);
+    await second.waitForLoadState();
+    const secondId = await panel.evaluate(async (url) => (await chrome.tabs.query({ url }))[0]?.id, `${base}/frame.html`);
+    await tool('read_page', { tabId });
+    await tool('read_page', { tabId: secondId });
+
+    const favicons = () => panel.evaluate(async (ids) => Promise.all(ids.map(async (id) => (await chrome.tabs.get(id)).favIconUrl ?? '')), [tabId, secondId!]);
+    await expect.poll(async () => (await favicons()).map((url) => url.startsWith('data:image/svg+xml'))).toEqual([true, true]);
+
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'agent/running', running: false }));
+    await expect(page.locator('#nova-ai-favicon')).toHaveCount(0);
+    await expect(second.locator('#nova-ai-favicon')).toHaveCount(0);
+    await tool('tabs_close', { tabId: secondId });
+});
+
 test('screenshot coordinates map back to CSS pixels', async () => {
     const shot = await tool('computer', { tabId, action: 'screenshot' });
     const image = shot.content.find((block) => block.type === 'image');
@@ -216,6 +235,38 @@ test('the panel reopens the last chat, with open prompts expired', async () => {
     await panel.evaluate(() => chrome.storage.local.clear());
 });
 
+test('the model menu sets the reasoning effort sent to Nova', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    await panel.route(`${base}/v1/**`, async (route) => {
+        if (route.request().url().endsWith('/models')) {
+            return route.fulfill({ json: { object: 'list', data: [
+                { id: 'thinker', object: 'model', created: 1, owned_by: 'e2e', name: 'Thinker', capabilities: ['tools'], reasoning_efforts: ['low', 'medium', 'high'] }
+            ] } });
+        }
+        requests.push(route.request().postDataJSON());
+        const chunk = { object: 'chat.completion.chunk', choices: [{ index: 0, delta: { content: 'Done thinking.' }, finish_reason: 'stop' }] };
+        return route.fulfill({ headers: { 'content-type': 'text/event-stream' }, body: `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n` });
+    });
+    await panel.evaluate((baseUrl) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'thinker' } }), `${base}/v1`);
+    await panel.reload();
+
+    const chip = panel.getByRole('button', { name: 'Model' });
+    await expect(chip).toHaveText(/Thinker \(Medium\)/);
+    await chip.click();
+    await panel.getByRole('radio', { name: 'High' }).click();
+    await panel.keyboard.press('Escape');
+    await expect(chip).toHaveText(/Thinker \(High\)/);
+
+    await panel.getByRole('textbox', { name: 'Message Nova' }).fill('Hi');
+    await panel.getByRole('button', { name: 'Send' }).click();
+    await expect(panel.getByText('Done thinking.')).toBeVisible();
+    expect(requests[0]).toMatchObject({ model: 'thinker', reasoning_effort: 'high' });
+
+    await panel.unrouteAll();
+    await panel.evaluate(() => chrome.storage.local.clear());
+    await panel.reload();
+});
+
 test('full-page screenshot covers the whole page and leaves click coordinates alone', async () => {
     await page.evaluate(() => window.scrollTo(0, 0));
     const shot = await tool('computer', { tabId, action: 'screenshot', full_page: true });
@@ -310,4 +361,35 @@ test('a new chat closes the tabs Nova opened and gives the user\'s tabs back', a
     }), [novaTab, tabId] as const);
     expect(state).toEqual({ novaOpen: false, userGroup: -1 });
     expect(page.isClosed()).toBe(false);
+});
+
+// After the group test: opening another chat ends the current one, and with it Nova's tabs.
+test('the chat list reopens and deletes saved chats', async () => {
+    const session = (id: string, title: string, reply: string, updatedAt: number) => ({
+        id, title, createdAt: 1, updatedAt, model: 'e2e-model', history: [],
+        items: [{ kind: 'user', id: 1, text: title }, { kind: 'assistant', id: 2, text: reply, thinking: '' }]
+    });
+    await panel.evaluate(async ([baseUrl, chats]) => {
+        await chrome.storage.local.set({
+            settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model' },
+            sessions: chats.map((chat) => chat.id),
+            ...Object.fromEntries(chats.map((chat) => [`session:${chat.id}`, chat]))
+        });
+    }, [`${base}/v1`, [session('newer', 'Newer chat', 'Newer reply', 2), session('older', 'Older chat', 'Older reply', 1)]] as const);
+    await panel.reload();
+    await expect(panel.getByText('Newer reply')).toBeVisible();
+
+    await panel.getByRole('button', { name: 'Chats' }).click();
+    await panel.getByRole('button', { name: /^Older chat/ }).click();
+    await expect(panel.getByText('Older reply')).toBeVisible();
+    await expect(panel.getByText('Newer reply')).toHaveCount(0);
+
+    panel.once('dialog', (dialog) => void dialog.accept());
+    await panel.getByRole('button', { name: 'Chats' }).click();
+    await panel.getByRole('button', { name: 'Delete Newer chat' }).click();
+    await expect(panel.getByRole('button', { name: /^Newer chat/ })).toHaveCount(0);
+    expect(await panel.evaluate(async () => ({ ...(await chrome.storage.local.get(['sessions', 'session:newer'])) }))).toEqual({ sessions: ['older'] });
+
+    await panel.evaluate(() => chrome.storage.local.clear());
+    await panel.reload();
 });

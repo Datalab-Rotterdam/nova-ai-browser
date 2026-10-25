@@ -49,9 +49,18 @@ export async function saveSession(session: StoredSession): Promise<void> {
     if (dropped.length) await chrome.storage.local.remove(dropped.map(sessionKey));
 }
 
+export async function loadSession(id: string): Promise<StoredSession | undefined> {
+    return (await chrome.storage.local.get(sessionKey(id)))[sessionKey(id)] as StoredSession | undefined;
+}
+
 export async function latestSession(): Promise<StoredSession | undefined> {
     const [id] = await sessionIds();
-    return id ? (await chrome.storage.local.get(sessionKey(id)))[sessionKey(id)] as StoredSession | undefined : undefined;
+    return id ? loadSession(id) : undefined;
+}
+
+export async function deleteSession(id: string): Promise<void> {
+    await chrome.storage.local.set({ [INDEX_KEY]: (await sessionIds()).filter((other) => other !== id) });
+    await chrome.storage.local.remove(sessionKey(id));
 }
 
 export async function allSessions(): Promise<StoredSession[]> {

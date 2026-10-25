@@ -2,12 +2,14 @@
     // Same composer as nova-ai-vscode (webview/src/chat/Composer.svelte), with browser actions in the toolbar.
     import type { ModelResponse } from '@datalabrotterdam/nova-sdk';
     import type { QueuedMessage } from '../chat.svelte';
+    import ModelMenu from './ModelMenu.svelte';
 
     interface Props {
         running: boolean;
         disabled: boolean;
         models: ModelResponse[];
         modelId: string;
+        effort: string;
         vision: boolean;
         value?: string;
         queue: QueuedMessage[];
@@ -17,10 +19,11 @@
         onqueuesendnow: (id: number) => void;
         onstop: () => void;
         onmodel: (modelId: string) => void;
+        oneffort: (effort: string) => void;
         onusetab: () => void;
     }
 
-    let { running, disabled, models, modelId, vision, value = $bindable(''), queue, onsend, onqueuemode, onqueueremove, onqueuesendnow, onstop, onmodel, onusetab }: Props = $props();
+    let { running, disabled, models, modelId, effort, vision, value = $bindable(''), queue, onsend, onqueuemode, onqueueremove, onqueuesendnow, onstop, onmodel, oneffort, onusetab }: Props = $props();
     let textarea: HTMLTextAreaElement | undefined = $state();
 
     // While Nova works, sending queues the message as steering (nothing is interrupted).
@@ -94,12 +97,7 @@
         <div class="toolbar">
             <button class="icon codicon codicon-browser" type="button" title="Let Nova use the current tab" aria-label="Let Nova use the current tab" onclick={onusetab}></button>
 
-            <select class="select" aria-label="Model" value={modelId} onchange={(event) => onmodel(event.currentTarget.value)} disabled={!models.length}>
-                {#if !models.length}<option value="">No models</option>{/if}
-                {#each models as model (model.id)}
-                    <option value={model.id} selected={model.id === modelId}>{model.name ?? model.id}</option>
-                {/each}
-            </select>
+            <ModelMenu {models} {modelId} {effort} {onmodel} {oneffort} />
 
             <span class="mode" title={vision ? 'Nova sees screenshots of the page' : 'Nova reads the page as text (model without vision)'}>
                 <span class={`codicon codicon-${vision ? 'eye' : 'list-flat'}`} aria-hidden="true"></span>
@@ -305,31 +303,6 @@
   }
 
   /* Size the dropdown to its selected option, not its longest one. */
-  .select {
-    field-sizing: content;
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: 55%;
-    padding: 1px 2px;
-    border: 1px solid transparent;
-    border-radius: var(--nova-radius);
-    background: transparent;
-    color: var(--nova-muted);
-    font: inherit;
-    font-size: 0.9em;
-    text-overflow: ellipsis;
-    cursor: pointer;
-
-    &:hover:not(:disabled) {
-      color: var(--nova-fg);
-      background: var(--nova-hover);
-    }
-
-    option {
-      background: var(--nova-input-bg);
-      color: var(--nova-fg);
-    }
-  }
 
   .mode {
     display: inline-flex;

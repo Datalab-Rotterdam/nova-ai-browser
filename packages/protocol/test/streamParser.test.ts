@@ -2,7 +2,7 @@ import type { ChatCompletionChunk } from '@datalabrotterdam/nova-sdk';
 import { describe, expect, it } from 'vitest';
 import { ChatStreamParser } from '../src/model/streamParser';
 import { createToolPayload } from '../src/model/toolNames';
-import { modelCapabilities } from '../src/model/capabilities';
+import { effortFor, hasThinkingSwitch, modelCapabilities, modelEfforts } from '../src/model/capabilities';
 import { TOOL_DEFINITIONS, isReadOnlyCall } from '../src/tools';
 
 function collect(chunks: ChatCompletionChunk[]) {
@@ -83,6 +83,24 @@ describe('tool helpers', () => {
     it('reads model capabilities', () => {
         expect(modelCapabilities({ capabilities: ['Vision', 'tools'] })).toEqual({ toolCalling: true, imageInput: true });
         expect(modelCapabilities({})).toEqual({ toolCalling: false, imageInput: false });
+    });
+});
+
+describe('reasoning effort', () => {
+    it('uses the listed levels, or an on/off switch for a reasoning model without levels', () => {
+        expect(modelEfforts({ reasoning_efforts: ['low', 'medium', 'high'] })).toEqual(['low', 'medium', 'high']);
+        expect(modelEfforts({ capabilities: ['reasoning'] })).toEqual(['none', 'medium']);
+        expect(hasThinkingSwitch({ capabilities: ['reasoning'] })).toBe(true);
+        expect(modelEfforts({ capabilities: ['tools'] })).toEqual([]);
+    });
+
+    it('sends the chosen level when the model accepts it, else a default', () => {
+        const levels = { reasoning_efforts: ['none', 'low', 'medium', 'high'] };
+        expect(effortFor(levels, 'high')).toBe('high');
+        expect(effortFor(levels, 'xhigh')).toBe('medium');
+        expect(effortFor({ ...levels, reasoning_default: 'off' }, undefined)).toBe('none');
+        expect(effortFor({ reasoning_efforts: ['low', 'high'] }, undefined)).toBe('low');
+        expect(effortFor({ capabilities: ['tools'] }, 'high')).toBeUndefined();
     });
 });
 
