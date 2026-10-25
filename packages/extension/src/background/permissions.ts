@@ -74,6 +74,8 @@ export async function ensureSiteAllowed(url: string, tool: string, summary: stri
         throw new Error(`The user blocked Nova on ${origin}. Do not try this site again; tell the user.`);
     }
     if (stored === 'always' || (await sessionAllowed()).includes(origin)) return;
+    // The agent's user approved this call there (the agent itself was approved here first); a blocked site stays blocked.
+    if (client?.preApproved) return;
     if (!(await loadSettings()).askBeforeActing || (DEV_TOOLS && caller === 'debug')) return;
 
     const decision = await requestDecision(`site:${origin}`, { kind: 'site', origin, tool, summary, agent: client?.name });

@@ -32,6 +32,8 @@ export interface AgentClient {
     id: string;
     /** What the user sees, e.g. "Visual Studio Code". */
     name: string;
+    /** The agent says its user already approved this call (Nova's own permissions): no site prompt. */
+    preApproved?: boolean;
 }
 
 export interface ToolCallRequest {
