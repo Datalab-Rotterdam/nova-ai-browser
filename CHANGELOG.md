@@ -1,3 +1,13 @@
+# [1.3.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.2.0...v1.3.0) (2026-10-25)
+
+
+### Features
+
+* **extension:** pick the model and reasoning effort from a menu ([271c518](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/271c518f7f95dec8602534dd5596bf5211cea99d))
+* **extension:** reopen and delete saved chats from a chat list ([6e5fc7d](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/6e5fc7de0fc76e6be8fce7bb106c1633a941b1a3))
+* **extension:** show the Nova mark as favicon on tabs Nova is using ([0ae4988](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/0ae498851977008fb3eb2795f8ff7d7bb797afcd))
+* let an approving agent skip the site prompt ([d024ea2](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/d024ea23443ecea075f921c742ef50b8833b148a))
+
 # [1.2.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.1.0...v1.2.0) (2026-10-25)
 
 
