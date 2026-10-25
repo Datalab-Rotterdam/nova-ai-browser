@@ -244,13 +244,16 @@ export class ChatSession {
         }
 
         const vision = this.visionFor(settings);
-        const key = JSON.stringify([settings.apiKey, settings.baseUrl, settings.model, vision, settings.maxRounds]);
+        const model = this.models.find((m) => m.id === settings.model);
+        const contextWindow = model ? modelCapabilities(model).contextWindow : undefined;
+        const key = JSON.stringify([settings.apiKey, settings.baseUrl, settings.model, vision, contextWindow, settings.maxRounds]);
         if (!this.agent || key !== this.agentKey) {
             this.agent = new NovaBrowserAgent({
                 apiKey: settings.apiKey,
                 baseUrl: settings.baseUrl,
                 model: settings.model,
                 vision,
+                contextWindow,
                 maxRounds: settings.maxRounds,
                 runTool: (call) => callTool(call.name, call.args, 'sidepanel'),
                 takeSteering: () => this.takeSteering(),

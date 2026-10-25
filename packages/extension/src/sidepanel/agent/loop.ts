@@ -6,20 +6,32 @@
  *   as fallback when the server rejects tools.
  * - Screenshots go back as `image_url` parts for vision models. Only the newest few images
  *   stay in the history, older ones become a placeholder, to bound context size.
+ * - Before each request the history is compacted to fit the model's context window (older tool
+ *   results shortened, then older turns summarized, then dropped); on an overflow error it is
+ *   compacted harder and the request retried once.
  */
-import { NovaAI, type ChatMessage } from '@datalabrotterdam/nova-sdk';
+import { collectChatText, NovaAI, type ChatMessage } from '@datalabrotterdam/nova-sdk';
 import {
     ChatStreamParser,
     createToolPayload,
+    estimateTextTokens,
+    fitToBudget,
+    inputBudget,
+    isContextOverflow,
     isToolCallingRejected,
+    parseContextLimit,
     resultText,
     TOOL_DEFINITIONS,
     type ToolResult
 } from '@datalabrotterdam/nova-ai-browser-protocol';
-import { systemPrompt } from './prompt';
+import { COMPACTION_PROMPT, systemPrompt } from './prompt';
 
 const KEPT_IMAGES = 2;
 const IMAGE_PLACEHOLDER = '[older screenshot removed to save context]';
+/** Context window assumed for models that do not advertise one (nova-ai-vscode's default). */
+const DEFAULT_CONTEXT_WINDOW = 32_768;
+/** Share of the input budget at which the conversation is compacted. */
+const COMPACT_THRESHOLD = 0.8;
 
 export interface ToolCall {
     id: string;
@@ -43,6 +55,8 @@ export interface AgentOptions {
     model: string;
     vision: boolean;
     maxRounds: number;
+    /** The model's context window in tokens, when it advertises one. */
+    contextWindow?: number;
     runTool(call: ToolCall): Promise<ToolResult>;
     /**
      * Messages the user sent while Nova works ("steering"). Called before every model call
@@ -61,11 +75,13 @@ export class NovaBrowserAgent {
     private textTools = false;
     private lastSignature = '';
     private repeats = 0;
+    private contextWindow: number;
 
     public constructor(private readonly options: AgentOptions) {
         // Bind fetch: extension pages throw "Illegal invocation" for an unbound window.fetch.
         this.client = new NovaAI({ apiKey: options.apiKey, baseUrl: options.baseUrl, fetch: (input, init) => fetch(input, init) });
         this.history = options.history ?? [];
+        this.contextWindow = options.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
     }
 
     public async run(prompt: string, events: AgentEvents, signal: AbortSignal): Promise<void> {
@@ -178,6 +194,7 @@ export class NovaBrowserAgent {
     }
 
     private async complete(events: AgentEvents, signal: AbortSignal): Promise<{ calls: ToolCall[] }> {
+        await this.compact(events, signal, COMPACT_THRESHOLD);
         try {
             return await this.stream(events, signal);
         } catch (error) {
@@ -187,8 +204,54 @@ export class NovaBrowserAgent {
                 events.notice('This model does not support native tool calls; using text tool calls.');
                 return this.stream(events, signal);
             }
+            if (isContextOverflow(error)) {
+                // The estimate or the advertised window was off: learn the real limit when the
+                // server reports it, compact hard and retry once.
+                this.contextWindow = Math.min(this.contextWindow, parseContextLimit(error) ?? Infinity);
+                await this.compact(events, signal, 0, 0.75);
+                return this.stream(events, signal);
+            }
             throw error;
         }
+    }
+
+    /** Replaces the history with a compacted copy once it outgrows `threshold` of the input budget. */
+    private async compact(events: AgentEvents, signal: AbortSignal, threshold: number, budgetShare = 1): Promise<void> {
+        const fixed = estimateTextTokens(this.systemPrompt()) + (this.textTools ? 0 : estimateTextTokens(JSON.stringify(createToolPayload(TOOL_DEFINITIONS).payload)));
+        const budget = Math.max(1_024, Math.floor((inputBudget(this.contextWindow) - fixed) * budgetShare));
+        const fitted = await fitToBudget(pruneImages(this.history, this.keptImages()), {
+            budget,
+            threshold,
+            summarize: (transcript) => this.summarize(transcript, budget, signal)
+        });
+        if (fitted.stage === 'none') {
+            return;
+        }
+        this.history.splice(0, this.history.length, ...fitted.messages);
+        events.notice({
+            pruned: 'Shortened older tool results to stay within the model\'s context window.',
+            summarized: 'Summarized earlier messages to stay within the model\'s context window.',
+            trimmed: 'Removed the oldest messages to stay within the model\'s context window.'
+        }[fitted.stage]);
+    }
+
+    /** Asks the model for a summary of older turns, without tools. */
+    private async summarize(transcript: string, budget: number, signal: AbortSignal): Promise<string> {
+        // Leave room for the prompt itself and the summary.
+        const maxChars = Math.max(2_000, Math.floor(budget * 0.6) * 3);
+        const clipped = transcript.length > maxChars ? `[… earlier transcript omitted …]\n${transcript.slice(-maxChars)}` : transcript;
+        return collectChatText(this.client.chat.completions.stream(
+            { model: this.options.model, messages: [{ role: 'user', content: COMPACTION_PROMPT.replace('{transcript}', () => clipped) }] },
+            { signal }
+        ));
+    }
+
+    private systemPrompt(): string {
+        return systemPrompt({ vision: this.options.vision, textTools: this.textTools, now: new Date() });
+    }
+
+    private keptImages(): number {
+        return this.options.vision ? KEPT_IMAGES : 0;
     }
 
     private async stream(events: AgentEvents, signal: AbortSignal): Promise<{ calls: ToolCall[] }> {
@@ -209,8 +272,8 @@ export class NovaBrowserAgent {
         );
 
         const messages: ChatMessage[] = [
-            { role: 'system', content: systemPrompt({ vision: this.options.vision, textTools: this.textTools, now: new Date() }) },
-            ...pruneImages(this.history, this.options.vision ? KEPT_IMAGES : 0)
+            { role: 'system', content: this.systemPrompt() },
+            ...pruneImages(this.history, this.keptImages())
         ];
 
         const stream = this.client.chat.completions.stream(
