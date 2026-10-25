@@ -8,6 +8,14 @@ import { overlay } from './content';
 
 const geometries = new Map<number, ScreenshotGeometry>();
 
+/** Longest page a full-page screenshot covers, in CSS pixels (about 20 viewports). */
+const MAX_FULL_PAGE_HEIGHT = 16_384;
+/** Long edge of the model's copy of a full-page screenshot; its pixel budget stays that of a normal screenshot. */
+const FULL_PAGE_MAX_EDGE = 4_096;
+/** Limits of the user's full-resolution copy: canvas size limits, and a reasonable image to open. */
+const MAX_FULL_IMAGE_SIDE = 16_384;
+const MAX_FULL_IMAGE_PIXELS = 40_000_000;
+
 export interface Capture {
     data: string;
     mimeType: string;
@@ -44,12 +52,13 @@ function fromBase64(data: string): Uint8Array<ArrayBuffer> {
 }
 
 async function encode(bitmap: ImageBitmap, source: { x: number; y: number; width: number; height: number }, width: number, height: number): Promise<string> {
-    const canvas = new OffscreenCanvas(width, height);
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Could not create a canvas to scale the screenshot.');
-    context.imageSmoothingQuality = 'high';
+    const { canvas, context } = canvas2d(width, height);
     context.drawImage(bitmap, source.x, source.y, source.width, source.height, 0, 0, width, height);
-    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.82 });
+    return toJpeg(canvas);
+}
+
+async function toJpeg(canvas: OffscreenCanvas, quality = 0.82): Promise<string> {
+    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
     return toBase64(new Uint8Array(await blob.arrayBuffer()));
 }
 
@@ -83,6 +92,79 @@ export async function screenshot(tabId: number, options: { showCursor?: boolean 
     } finally {
         bitmap.close();
     }
+}
+
+export interface FullPageCapture extends Capture {
+    /** The page's size in CSS pixels, and whether it was longer than the capture. */
+    pageWidth: number;
+    pageHeight: number;
+    truncated: boolean;
+    /** The page at screen resolution, for the user only. */
+    full: { data: string; mimeType: string; width: number; height: number };
+}
+
+function canvas2d(width: number, height: number): { canvas: OffscreenCanvas; context: OffscreenCanvasRenderingContext2D } {
+    const canvas = new OffscreenCanvas(width, height);
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not create a canvas for the screenshot.');
+    context.imageSmoothingQuality = 'high';
+    return { canvas, context };
+}
+
+async function evaluate<T>(tabId: number, expression: string): Promise<T> {
+    const { result } = await send<{ result: { value: T } }>(tabId, 'Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    return result.value;
+}
+
+/**
+ * The whole scrollable page, stitched from one capture per viewport while scrolling
+ * (chrome.debugger only captures the visible surface). Returns it twice: at screen resolution
+ * for the user, and scaled into the screenshot budget for the model. For looking only: its
+ * pixels are page coordinates, so it leaves the tab's geometry for clicks alone.
+ * ponytail: fixed and sticky headers show on every slice, and pages that scroll an inner element
+ * instead of the window come out as one viewport; hide fixed elements while capturing if that matters.
+ */
+export async function fullPageScreenshot(tabId: number, options: { showCursor?: boolean } = {}): Promise<FullPageCapture> {
+    const css = await viewportSize(tabId);
+    const [scrollX, scrollY, scrollHeight] = await evaluate<[number, number, number]>(tabId, '[window.scrollX, window.scrollY, document.documentElement.scrollHeight]');
+    const pageHeight = Math.ceil(scrollHeight);
+    const height = Math.min(pageHeight, MAX_FULL_PAGE_HEIGHT);
+    // Screen resolution, within what canvases and image viewers handle.
+    const fullScale = Math.min(css.dpr, MAX_FULL_IMAGE_SIDE / height, Math.sqrt(MAX_FULL_IMAGE_PIXELS / (css.width * height)));
+    const full = canvas2d(Math.round(css.width * fullScale), Math.round(height * fullScale));
+
+    try {
+        for (let top = 0, previous = -1; top < height;) {
+            // The last slice is clamped by the browser; draw it where it really is.
+            const actual = await evaluate<number>(tabId, `window.scrollTo(0, ${top}), new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.scrollY))))`);
+            if (actual <= previous) break; // the window does not scroll any further
+            previous = actual;
+            const bitmap = await captureRaw(tabId, options.showCursor ?? false);
+            try {
+                // Place each slice by its own size: the viewport can shrink meanwhile (Chrome's debugging bar).
+                const sliceHeight = bitmap.height * css.width / bitmap.width;
+                full.context.drawImage(bitmap, 0, actual * fullScale, full.canvas.width, sliceHeight * fullScale);
+                top = actual + sliceHeight;
+            } finally {
+                bitmap.close();
+            }
+        }
+    } finally {
+        await evaluate(tabId, `window.scrollTo(${scrollX}, ${scrollY})`);
+    }
+
+    const size = fitImageSize(css.width, height, FULL_PAGE_MAX_EDGE);
+    const scaled = canvas2d(size.width, size.height);
+    scaled.context.drawImage(full.canvas, 0, 0, size.width, size.height);
+    return {
+        data: await toJpeg(scaled.canvas),
+        mimeType: 'image/jpeg',
+        geometry: { imageWidth: size.width, imageHeight: size.height, cssWidth: css.width, cssHeight: height },
+        pageWidth: css.width,
+        pageHeight,
+        truncated: pageHeight > height,
+        full: { data: await toJpeg(full.canvas, 0.9), mimeType: 'image/jpeg', width: full.canvas.width, height: full.canvas.height }
+    };
 }
 
 /** Close-up of a region given in screenshot pixels. Does not change the tab's geometry. */

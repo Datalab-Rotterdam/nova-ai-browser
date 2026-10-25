@@ -27,6 +27,8 @@ export default defineManifest(({ mode }) => ({
     permissions: [
         'sidePanel',
         'storage',
+        // Saved chats can outgrow the 10 MB default.
+        'unlimitedStorage',
         'scripting',
         'debugger',
         'tabs',

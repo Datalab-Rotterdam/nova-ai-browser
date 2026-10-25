@@ -188,3 +188,107 @@ test('tabs outside the group are refused', async () => {
     expect(text(result)).toContain('not in the Nova tab group');
     await other.close();
 });
+
+test('the panel reopens the last chat, with open prompts expired', async () => {
+    await panel.evaluate(async (baseUrl) => {
+        await chrome.storage.local.set({
+            settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model' },
+            sessions: ['e2e-chat'],
+            'session:e2e-chat': {
+                id: 'e2e-chat', title: 'Restore me', createdAt: 1, updatedAt: 2, model: 'e2e-model', history: [],
+                items: [
+                    { kind: 'user', id: 1, text: 'Restore me' },
+                    { kind: 'assistant', id: 2, text: 'Restored reply', thinking: '' },
+                    { kind: 'permission', id: 3, requestId: 'gone', subject: 'site', target: 'https://example.com', tool: 'read_page', summary: 'read page' }
+                ]
+            }
+        });
+    }, `${base}/v1`);
+    await panel.reload();
+    await expect(panel.getByText('Restored reply')).toBeVisible();
+    await expect(panel.locator('.answered')).toHaveText('Expired');
+    await panel.evaluate(() => chrome.storage.local.clear());
+});
+
+test('full-page screenshot covers the whole page and leaves click coordinates alone', async () => {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const shot = await tool('computer', { tabId, action: 'screenshot', full_page: true });
+    const image = shot.content.find((block) => block.type === 'image');
+    expect(image).toBeTruthy();
+    const [, pageW, pageH] = text(shot).match(/page (\d+)x(\d+) CSS px/)!;
+    const viewport = await page.evaluate(() => ({ h: window.innerHeight, scroll: document.documentElement.scrollHeight }));
+    expect(Number(pageH)).toBe(viewport.scroll);
+    expect(Number(pageH)).toBeGreaterThan(viewport.h);
+
+    // The bottom button, far below the window, is drawn where it is on the page (no repeated or stretched slices).
+    const button = await page.evaluate(() => {
+        const rect = document.getElementById('bottom')!.getBoundingClientRect();
+        return { x: rect.x + window.scrollX, y: rect.y + window.scrollY, w: rect.width, h: rect.height };
+    });
+    const dark = await panel.evaluate(async ({ src, button, pageW }) => {
+        const img = new Image();
+        img.src = src;
+        await img.decode();
+        const k = img.naturalWidth / pageW;
+        const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight);
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        const { data } = ctx.getImageData(button.x * k, button.y * k, Math.max(1, button.w * k), Math.max(1, button.h * k));
+        let count = 0;
+        for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] < 300) count++;
+        return count;
+    }, { src: `data:image/jpeg;base64,${(image as { data: string }).data}`, button, pageW: Number(pageW) });
+    expect(dark).toBeGreaterThan(5);
+
+    // The user gets the full-resolution image, with a note that the model got a smaller copy.
+    const [, modelW] = text(shot).match(/image (\d+)x(\d+)px/)!;
+    expect(shot.userImage?.note).toMatch(/Nova only got a scaled-down copy/);
+    const full = await panel.evaluate(async (src) => {
+        const img = new Image();
+        img.src = src;
+        await img.decode();
+        return img.naturalWidth;
+    }, `data:image/jpeg;base64,${shot.userImage!.data}`);
+    expect(full).toBeGreaterThan(Number(modelW));
+
+    // Clicking by the coordinates of a normal screenshot still works afterwards.
+    const normal = await tool('computer', { tabId, action: 'screenshot' });
+    const [, w, h] = text(normal).match(/Image is (\d+)x(\d+)px/)!;
+    const box = (await page.locator('#increment').boundingBox())!;
+    const inner = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+    const before = Number(await page.locator('#count').innerText());
+    await tool('computer', { tabId, action: 'left_click', coordinate: [(box.x + box.width / 2) * Number(w) / inner.w, (box.y + box.height / 2) * Number(h) / inner.h] });
+    await expect(page.locator('#count')).toHaveText(String(before + 1));
+});
+
+test('a screenshot in the panel opens in a zoomable viewer', async () => {
+    await panel.evaluate((baseUrl) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model' } }), `${base}/v1`);
+    await panel.reload();
+    await panel.getByRole('button', { name: 'Tool tester' }).click();
+    await panel.locator('#tool').selectOption('computer');
+    await panel.locator('#args').fill(JSON.stringify({ tabId, action: 'screenshot', full_page: true }));
+    await page.bringToFront();
+    await panel.locator('button[type=submit]').click();
+    await panel.locator('.shot-button').last().click();
+
+    const viewer = panel.getByRole('dialog', { name: 'Full-page screenshot' });
+    await expect(viewer).toBeVisible();
+    const image = viewer.locator('img');
+    const fitted = (await image.boundingBox())!.width;
+    await viewer.getByRole('button', { name: 'Zoom in' }).click();
+    await expect(viewer.locator('.level')).toHaveText('1.5×');
+    expect((await image.boundingBox())!.width).toBeCloseTo(fitted * 1.5, 0);
+
+    // A trackpad pinch (ctrl + wheel) zooms; 0 fits again; Escape closes.
+    const stage = (await viewer.locator('.stage').boundingBox())!;
+    await panel.mouse.move(stage.x + stage.width / 2, stage.y + stage.height / 2);
+    await panel.keyboard.down('Control');
+    await panel.mouse.wheel(0, -200);
+    await panel.keyboard.up('Control');
+    await expect(viewer.locator('.level')).toHaveText('4.1×');
+    await panel.keyboard.press('0');
+    await expect(viewer.locator('.level')).toHaveText('1.0×');
+    await panel.keyboard.press('Escape');
+    await expect(viewer).toBeHidden();
+    await panel.evaluate(() => chrome.storage.local.clear());
+});

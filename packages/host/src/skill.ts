@@ -15,14 +15,13 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toolsReference } from './call';
 import { launcherScript, type NodeRuntime } from './install';
+import { novaHome } from './paths';
 import { VERSION } from './version';
 
 export const SKILL_NAME = 'nova-browser';
 /** Marks a skill as bundled: shipped and kept up to date by a Nova app, read-only for users. */
 export const BUNDLE_FILE = '.nova-bundled.json';
 export const BUNDLED_BY = 'Nova AI Browser';
-/** Marker of versions before bundled skills; still recognized as ours. */
-const LEGACY_MARKER = '.installed-by-nova-ai-browser';
 
 export interface BundleInfo {
     bundledBy: string;
@@ -37,7 +36,7 @@ export type SkillTarget = typeof SKILL_TARGETS[number];
 export function skillsFolder(target: SkillTarget): string {
     const home = homedir();
     switch (target) {
-        case 'nova': return join(process.env.NOVA_AI_HOME?.trim() || join(home, '.nova-ai'), 'skills');
+        case 'nova': return join(novaHome(), 'skills');
         case 'agents': return join(home, '.agents', 'skills');
         case 'claude': return join(home, '.claude', 'skills');
         case 'codex': return join(process.env.CODEX_HOME?.trim() || join(home, '.codex'), 'skills');
@@ -87,7 +86,7 @@ function readBundle(dir: string): BundleInfo | undefined {
 
 /** Whether the folder holds a copy this package installed (never touch anyone else's skill). */
 function isOurs(dir: string): boolean {
-    return readBundle(dir) !== undefined || existsSync(join(dir, LEGACY_MARKER));
+    return readBundle(dir) !== undefined;
 }
 
 function listFiles(dir: string): string[] {
@@ -100,12 +99,12 @@ function listFiles(dir: string): string[] {
     return files;
 }
 
-/** Hash of every file except the markers, so any edit, addition or removal shows. */
+/** Hash of every file except the marker, so any edit, addition or removal shows. */
 export function skillHash(dir: string): string {
     const hash = createHash('sha256');
     for (const file of listFiles(dir).sort()) {
         const name = relative(dir, file).split('\\').join('/');
-        if (name === BUNDLE_FILE || name === LEGACY_MARKER) continue;
+        if (name === BUNDLE_FILE) continue;
         hash.update(name).update('\0').update(readFileSync(file)).update('\0');
     }
     return hash.digest('hex');
@@ -154,7 +153,8 @@ export function installSkill(targets: readonly SkillTarget[], runtime: SkillRunt
         const current = bundle?.version === VERSION
             && bundle.hash === skillHash(dir)
             && readOrEmpty(join(dir, 'scripts', 'nova-browser')) === scripts.unix
-            && readOrEmpty(join(dir, 'SKILL.md')) === readOrEmpty(join(source, 'SKILL.md'));
+            && readOrEmpty(join(dir, 'SKILL.md')) === readOrEmpty(join(source, 'SKILL.md'))
+            && readOrEmpty(join(dir, 'references', 'tools.md')) === toolsReference();
         if (current) continue;
 
         unlock(dir);

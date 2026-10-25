@@ -6,6 +6,11 @@ export type ContentBlock =
 export interface ToolResult {
     content: ContentBlock[];
     isError?: boolean;
+    /**
+     * Shown to the user instead of the content's image and never sent to a model or an external
+     * agent, e.g. a full-page screenshot at full resolution. `note` says what the model got instead.
+     */
+    userImage?: { type: 'image'; data: string; mimeType: string; note: string };
 }
 
 export type JsonSchema = Record<string, unknown>;

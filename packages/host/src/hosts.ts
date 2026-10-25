@@ -4,7 +4,7 @@
  */
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { hostsDir, legacyHostInfoPath, type HostInfo } from './paths';
+import { hostsDir, type HostInfo } from './paths';
 
 export function isAlive(pid: number): boolean {
     try {
@@ -18,7 +18,6 @@ export function isAlive(pid: number): boolean {
 
 /** Live hosts, newest first. Files of hosts that are gone (crash, kill) are removed. */
 export function liveHosts(alive: (pid: number) => boolean = isAlive): HostInfo[] {
-    rmSync(legacyHostInfoPath(), { force: true });
     let files: string[];
     try {
         files = readdirSync(hostsDir()).filter((name) => name.endsWith('.json'));

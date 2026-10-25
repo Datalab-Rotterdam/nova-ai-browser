@@ -4,6 +4,7 @@
  * keeps the service worker alive, so external agents can call tools at any time.
  */
 import { errorResult, identifyClient, type AgentClient, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { allSessions } from '../lib/sessions';
 import { loadSettings } from '../lib/settings';
 
 export const HOST_NAME = 'nl.datalabrotterdam.nova_ai_browser';
@@ -74,12 +75,15 @@ async function openPort(): Promise<void> {
         if (message.type === 'hello') {
             retries = 0;
             void setStatus({ state: 'connected', version: String(message.version ?? ''), mcpUrl: String(message.mcpUrl ?? '') });
+            // Chats saved while the host was away; the host also removes files of deleted chats.
+            void allSessions().then((sessions) => notifyHost({ type: 'sessions/sync', sessions }));
         } else if (message.type === 'tool/call' && typeof message.id === 'string') {
             const id = message.id;
             const reported = message.client as Partial<AgentClient> | undefined;
             const client = identifyClient(reported?.name);
             void runner(String(message.name), (message.args ?? {}) as Record<string, unknown>, client).then((result) => {
-                notifyHost({ type: 'tool/result', id, result });
+                // userImage is for the side panel only; agents get the content.
+                notifyHost({ type: 'tool/result', id, result: { content: result.content, isError: result.isError } });
             });
         }
     });

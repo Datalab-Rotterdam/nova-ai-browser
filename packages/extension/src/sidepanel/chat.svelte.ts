@@ -1,6 +1,7 @@
-import { modelCapabilities, type PanelEvent, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
-import { NovaAI, NovaAIError, type ModelResponse } from '@datalabrotterdam/nova-sdk';
+import { errorResult, modelCapabilities, type PanelEvent, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { NovaAI, NovaAIError, type ChatMessage, type ModelResponse } from '@datalabrotterdam/nova-sdk';
 import { answerPermission, callTool, setAgentRunning } from '../lib/bridge';
+import { latestSession, saveSession } from '../lib/sessions';
 import { saveSettings, type Settings } from '../lib/settings';
 import { NovaBrowserAgent, type ToolCall } from './agent/loop';
 
@@ -50,6 +51,40 @@ export class ChatSession {
     private lastSettings: Settings | undefined;
     private agentKey = '';
     private controller: AbortController | undefined;
+    private sessionId: string = crypto.randomUUID();
+    private createdAt = Date.now();
+    /** The model conversation of a restored chat, until the first run creates an agent with it. */
+    private restoredHistory: ChatMessage[] | undefined;
+
+    /** Reopens the most recent chat, e.g. after the panel was closed. */
+    async restore(): Promise<void> {
+        const session = await latestSession();
+        if (!session) return;
+        for (const item of session.items) {
+            // Prompts and tool calls that were open when the panel closed cannot finish any more.
+            if (item.kind === 'permission' && !item.answered) item.answered = 'Expired';
+            if (item.kind === 'tool' && !item.result) item.result = errorResult('Interrupted: the side panel was closed.');
+            nextId = Math.max(nextId, item.id + 1);
+        }
+        this.items = session.items;
+        this.sessionId = session.id;
+        this.createdAt = session.createdAt;
+        this.restoredHistory = session.history;
+    }
+
+    private save(): void {
+        const first = this.items.find((item) => item.kind === 'user');
+        if (!first) return;
+        void saveSession({
+            id: this.sessionId,
+            title: first.text.slice(0, 80),
+            createdAt: this.createdAt,
+            updatedAt: Date.now(),
+            model: this.lastSettings?.model ?? '',
+            items: this.items,
+            history: this.agent?.history ?? this.restoredHistory ?? []
+        }).catch(() => undefined);
+    }
 
     async loadModels(settings: Settings): Promise<void> {
         this.modelsError = undefined;
@@ -106,6 +141,9 @@ export class ChatSession {
         this.items = [];
         this.queue = [];
         this.agent = undefined;
+        this.restoredHistory = undefined;
+        this.sessionId = crypto.randomUUID();
+        this.createdAt = Date.now();
     }
 
     stop(reason?: string): void {
@@ -215,9 +253,12 @@ export class ChatSession {
                 vision,
                 maxRounds: settings.maxRounds,
                 runTool: (call) => callTool(call.name, call.args, 'sidepanel'),
-                takeSteering: () => this.takeSteering()
+                takeSteering: () => this.takeSteering(),
+                // Keep the conversation when settings change (e.g. another model) or a chat was restored.
+                history: this.agent?.history ?? this.restoredHistory
             });
             this.agentKey = key;
+            this.restoredHistory = undefined;
         }
 
         this.push({ kind: 'user', id: 0, text: prompt, ...(steered ? { steered } : {}) });
@@ -246,12 +287,14 @@ export class ChatSession {
                 toolEnd: (call, result) => {
                     const item = toolItems.get(call.id);
                     if (item) item.result = result;
+                    this.save();
                 },
                 roundEnd: () => {
                     if (current && !current.text.trim() && !current.thinking.trim()) {
                         this.items = this.items.filter((item) => item.id !== current!.id);
                     }
                     current = undefined;
+                    this.save();
                 },
                 notice: (text) => { this.push({ kind: 'notice', id: 0, text, tone: 'info' }); }
             }, signal);
@@ -265,6 +308,7 @@ export class ChatSession {
         } finally {
             this.running = false;
             this.controller = undefined;
+            this.save();
             await setAgentRunning(false);
             this.drainQueue();
         }
