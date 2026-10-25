@@ -138,6 +138,19 @@ test('a new agent must be approved by the user, then each new site', async () =>
     expect(shot.content.some((block) => block.type === 'image' && (block.data?.length ?? 0) > 1000)).toBe(true);
 });
 
+test('a pay button asks the user, also for external agents', async () => {
+    const tabs = JSON.parse(text(await stdio.callTool({ name: 'tabs_context', arguments: {} }) as CallResult));
+    const tabId = tabs.tabs.find((tab: { url: string }) => tab.url.startsWith(base)).tabId;
+    const found = text(await stdio.callTool({ name: 'find', arguments: { tabId, query: 'pay now' } }) as CallResult);
+    const ref = found.match(/button "Pay now" \[(ref_\d+)\]/)?.[1];
+    expect(ref).toBeTruthy();
+
+    const click = stdio.callTool({ name: 'computer', arguments: { tabId, action: 'left_click', ref } }) as Promise<CallResult>;
+    expect(await answerPopup('Deny')).toContain('Pay now');
+    expect((await click).isError).toBe(true);
+    await expect(page.locator('#paid')).toHaveText('no');
+});
+
 test('a denied agent is refused, and not asked again', async () => {
     const { info } = hostInfoIn(home)!;
     const rogue = new Client({ name: 'rogue-agent', version: '1.0.0' });

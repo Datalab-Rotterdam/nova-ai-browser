@@ -13,6 +13,8 @@ export type PanelResponse<T extends PanelRequest> =
 export type PanelEvent =
     | { type: 'permission/request'; id: string; kind: 'site'; origin: string; tool: string; summary: string; agent?: string }
     | { type: 'permission/request'; id: string; kind: 'agent'; client: AgentClient; tool: string; summary: string }
+    /** A click or form input on a control that is hard to undo (`isIrreversibleControl`); `summary` describes the element. */
+    | { type: 'permission/request'; id: string; kind: 'action'; origin: string; tool: string; summary: string; agent?: string }
     | { type: 'permission/resolved'; id: string }
     | { type: 'agent/stop'; reason: string }
     | { type: 'tool/activity'; caller: ToolCaller; name: string; args: Record<string, unknown>; result?: ToolResult };
