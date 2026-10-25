@@ -32,3 +32,32 @@ function firstNumber(model: Record<string, unknown>, keys: string[]): number | u
     }
     return undefined;
 }
+
+type EffortModel = Pick<ModelResponse, 'capabilities'> & { reasoning_efforts?: unknown; reasoning_default?: unknown };
+
+/**
+ * Levels the gateway lists in `reasoning_efforts`, lowest first; a model that can think but lists
+ * none gets an Off / On switch (["none", "medium"]; "medium" stands for any level but "none").
+ * Ported from nova-ai-vscode src/panel/ChatController.ts `effortsOf`.
+ */
+export function modelEfforts(model: EffortModel | undefined): string[] {
+    const listed = Array.isArray(model?.reasoning_efforts) ? model.reasoning_efforts.filter((level) => typeof level === 'string') : [];
+    return !listed.length && model?.capabilities?.includes('reasoning') ? ['none', 'medium'] : listed;
+}
+
+/** Whether the model only has thinking on or off, no levels. */
+export function hasThinkingSwitch(model: EffortModel | undefined): boolean {
+    return modelEfforts(model).length > 0 && !(Array.isArray(model?.reasoning_efforts) && model.reasoning_efforts.length);
+}
+
+/**
+ * The `reasoning_effort` to send: the chosen level when the model accepts it, else "none" for a
+ * model that thinks only on request, else its middle level; undefined for a model without levels.
+ */
+export function effortFor(model: EffortModel | undefined, chosen: string | undefined): string | undefined {
+    const efforts = modelEfforts(model);
+    if (!efforts.length) return undefined;
+    if (chosen && efforts.includes(chosen)) return chosen;
+    if (efforts.includes('none') && model?.reasoning_default === 'off') return 'none';
+    return efforts.includes('medium') ? 'medium' : efforts[Math.floor((efforts.length - 1) / 2)];
+}

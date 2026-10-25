@@ -8,6 +8,8 @@ export interface Settings {
     apiKey: string;
     baseUrl: string;
     model: string;
+    /** Chosen reasoning effort; models that do not accept it get a default (see `effortFor`). */
+    effort: string;
     /** "auto" follows the model's capabilities from models.list(). */
     vision: 'auto' | 'on' | 'off';
     maxRounds: number;
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
     apiKey: '',
     baseUrl: DEFAULT_BASE_URL,
     model: '',
+    effort: '',
     vision: 'auto',
     maxRounds: 40,
     askBeforeActing: true,

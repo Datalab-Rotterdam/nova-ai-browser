@@ -1,4 +1,4 @@
-import { errorResult, modelCapabilities, type PanelEvent, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { effortFor, errorResult, modelCapabilities, type PanelEvent, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { NovaAI, NovaAIError, type ChatMessage, type ModelResponse } from '@datalabrotterdam/nova-sdk';
 import { answerPermission, callTool, releaseTabs, setAgentRunning } from '../lib/bridge';
 import { latestSession, saveSession } from '../lib/sessions';
@@ -247,7 +247,8 @@ export class ChatSession {
         const vision = this.visionFor(settings);
         const model = this.models.find((m) => m.id === settings.model);
         const contextWindow = model ? modelCapabilities(model).contextWindow : undefined;
-        const key = JSON.stringify([settings.apiKey, settings.baseUrl, settings.model, vision, contextWindow, settings.maxRounds]);
+        const effort = effortFor(model, settings.effort);
+        const key = JSON.stringify([settings.apiKey, settings.baseUrl, settings.model, vision, contextWindow, effort, settings.maxRounds]);
         if (!this.agent || key !== this.agentKey) {
             this.agent = new NovaBrowserAgent({
                 apiKey: settings.apiKey,
@@ -255,6 +256,7 @@ export class ChatSession {
                 model: settings.model,
                 vision,
                 contextWindow,
+                effort,
                 maxRounds: settings.maxRounds,
                 runTool: (call) => callTool(call.name, call.args, 'sidepanel'),
                 takeSteering: () => this.takeSteering(),

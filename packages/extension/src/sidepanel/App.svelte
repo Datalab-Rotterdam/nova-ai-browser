@@ -205,10 +205,12 @@
                     disabled={!settings.model}
                     models={chat.models.filter((m) => !(m.capabilities ?? []).some((c) => /embedding|audio/.test(c)))}
                     modelId={settings.model}
+                    effort={settings.effort}
                     {vision}
                     onsend={(text) => chat.send(text, settings)}
                     onstop={() => chat.stop('Stopped.')}
                     onmodel={(model) => saveSettings({ model })}
+                    oneffort={(effort) => saveSettings({ effort })}
                     onusetab={useThisTab}
             />
         {/if}
