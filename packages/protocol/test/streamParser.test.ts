@@ -85,3 +85,19 @@ describe('tool helpers', () => {
         expect(modelCapabilities({})).toEqual({ toolCalling: false, imageInput: false });
     });
 });
+
+describe('Qwen3-Coder XML tool calls', () => {
+    it('parses <function=…> calls inside <tool_call>, split across chunks', () => {
+        const out = collect([
+            content('I continue to read the page.\n\n<tool_call>\n<function=get_page_text>\n<parameter=max_chars>\n6000\n</param'),
+            content('eter>\n<parameter=tabId>\n2051140249\n</parameter>\n</function>\n</tool_call>')
+        ]);
+        expect(out.text.trim()).toBe('I continue to read the page.');
+        expect(out.calls).toEqual([{ name: 'get_page_text', input: { max_chars: 6000, tabId: 2051140249 } }]);
+    });
+
+    it('keeps values that are not JSON as text', () => {
+        const out = collect([content('<tool_call><function=navigate><parameter=url>https://example.com/a b</parameter><parameter=tabId>7</parameter></function></tool_call>')]);
+        expect(out.calls).toEqual([{ name: 'navigate', input: { url: 'https://example.com/a b', tabId: 7 } }]);
+    });
+});

@@ -153,11 +153,33 @@ export function gemmaCallToJson(block: string): string | undefined {
 }
 
 /**
+ * Converts the XML call syntax of Qwen3-Coder (and models trained like it) inside `<tool_call>`,
+ * `<function=name><parameter=key>value</parameter>…</function>`, into `[{"name": …, "arguments": {…}}]`.
+ * Values that read as JSON (numbers, booleans, objects, arrays) are taken as such, others as text.
+ */
+export function xmlCallsToJson(block: string): string | undefined {
+    const calls = [...block.matchAll(/<function=([^>\s]+)>([\s\S]*?)(?:<\/function>|$)/g)].map(([, name, body]) => {
+        const input: Record<string, unknown> = {};
+        for (const [, key, raw] of body.matchAll(/<parameter=([^>\s]+)>([\s\S]*?)(?:<\/parameter>|(?=<parameter=)|$)/g)) {
+            // ponytail: "123" for a text parameter becomes a number; use the tool schema if that bites.
+            const value = raw.replace(/^\n|\n$/g, '');
+            try {
+                input[key] = JSON.parse(value) as unknown;
+            } catch {
+                input[key] = value;
+            }
+        }
+        return { name, arguments: input };
+    });
+    return calls.length ? JSON.stringify(calls) : undefined;
+}
+
+/**
  * Parses a text tool-call block into calls for known tools. Returns undefined when the
  * block is not valid or names a tool that was not offered, so the caller can emit it as text.
  */
 export function parseTextToolCalls(block: string, isKnownTool: (name: string) => boolean): TextToolCall[] | undefined {
-    const parsed = parseJsonValue(gemmaCallToJson(block) ?? block);
+    const parsed = parseJsonValue(gemmaCallToJson(block) ?? xmlCallsToJson(block) ?? block);
     const items = Array.isArray(parsed) ? parsed : parsed === undefined ? [] : [parsed];
     const calls: TextToolCall[] = [];
 
