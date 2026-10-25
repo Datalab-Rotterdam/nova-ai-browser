@@ -1,15 +1,17 @@
 import { PANEL_PORT, type OverlayEvent, type PanelEvent, type PanelRequest } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { onDetach } from './cdp';
 import { answerPermission, clearSessionPermissions, denyAllPending, setPanelBroadcast } from './permissions';
-import { forgetTab, hideAll, isRunActive, restoreAfterNavigation, setRunActive } from './presence';
+import { forgetTab, hideAll, isExternalAgentActive, isRunActive, restoreAfterNavigation, setRunActive } from './presence';
 import { forgetGeometry } from './screenshot';
-import { addTabToGroup, isInGroup } from './tabs';
+import { addTabToGroup, isInGroup, releaseGroup } from './tabs';
 import { sessionIdOf } from '../lib/sessions';
 import { onSettingsChanged } from '../lib/settings';
 import { connectHost, disconnectHost, hostStatus, notifyHost, setToolRunner } from './native';
 import { blockExternalCallers, callTool } from './tools';
 
 const panels = new Set<chrome.runtime.Port>();
+/** A panel that reconnects within this time was reloaded, not closed. */
+const PANEL_RELOAD_MS = 3_000;
 const stopListeners = new Set<(reason: string) => void>();
 
 function broadcast(event: PanelEvent): boolean {
@@ -30,6 +32,14 @@ export async function stopAgent(reason: string): Promise<void> {
     for (const listener of stopListeners) listener(reason);
     await setRunActive(false);
     await clearSessionPermissions();
+}
+
+/**
+ * The side panel's chat ended: close Nova's tabs, unless an external agent is still working in
+ * them. External agents have no end of their own, so their tabs stay until then.
+ */
+async function releaseTabs(): Promise<void> {
+    if (!isExternalAgentActive()) await releaseGroup();
 }
 
 export function onStop(listener: (reason: string) => void): void {
@@ -78,10 +88,14 @@ chrome.runtime.onConnect.addListener((port) => {
         if (!panels.size && isRunActive()) {
             void stopAgent('The side panel was closed.');
         }
+        // And its chat, unless it was only reloaded.
+        setTimeout(() => {
+            if (!panels.size) void releaseTabs();
+        }, PANEL_RELOAD_MS);
     });
 });
 
-type ExtraRequest = { type: 'tabs/add-current' } | { type: 'host/connect' } | { type: 'host/status' };
+type ExtraRequest = { type: 'tabs/add-current' } | { type: 'tabs/release' } | { type: 'host/connect' } | { type: 'host/status' };
 
 chrome.runtime.onMessage.addListener((message: PanelRequest | OverlayEvent | ExtraRequest, sender, sendResponse) => {
     if (message?.type !== 'overlay/stop' && !fromExtensionPage(sender)) return false;
@@ -109,6 +123,9 @@ chrome.runtime.onMessage.addListener((message: PanelRequest | OverlayEvent | Ext
                 return true;
             }
             return false;
+        case 'tabs/release':
+            void releaseTabs().then(() => sendResponse({ ok: true }), (error: unknown) => sendResponse({ ok: false, error: String(error) }));
+            return true;
         case 'tabs/add-current':
             void chrome.tabs.query({ active: true, lastFocusedWindow: true })
                 .then(([tab]) => tab?.id !== undefined ? addTabToGroup(tab.id) : undefined)

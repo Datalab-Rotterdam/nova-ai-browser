@@ -11,6 +11,7 @@ const IDLE_MS = 20_000;
 
 let runActive = false;
 let idleTimer: ReturnType<typeof setTimeout> | undefined;
+let lastExternalCall = 0;
 /** Tab → name of the external agent working there (undefined for Nova in the side panel). */
 const shownTabs = new Map<number, string | undefined>();
 
@@ -39,10 +40,16 @@ export async function touch(tabId: number, agent?: string): Promise<void> {
     if (!shownTabs.has(tabId) || shownTabs.get(tabId) !== agent) {
         await show(tabId, agent);
     }
+    if (agent !== undefined) lastExternalCall = Date.now();
     clearTimeout(idleTimer);
     if (!runActive) {
         idleTimer = setTimeout(() => void hideAll(), IDLE_MS);
     }
+}
+
+/** Whether an external agent made a call within the idle window. */
+export function isExternalAgentActive(): boolean {
+    return Date.now() - lastExternalCall < IDLE_MS;
 }
 
 export async function hideAll(): Promise<void> {

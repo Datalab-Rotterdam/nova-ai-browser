@@ -83,10 +83,6 @@ test.beforeAll(async () => {
     // The extension connects to the host on startup; the host publishes hosts/<pid>.json when ready.
     await waitFor(() => hostInfoIn(home) ? true : undefined, 15_000, 'the host');
 
-    page = await context.newPage();
-    await page.goto(`${base}/index.html`);
-    await page.bringToFront();
-
     stdio = new Client({ name: 'nova-e2e', version: '1.0.0' });
     await stdio.connect(new StdioClientTransport({ command: process.execPath, args: [join(HOST_DIST, 'mcp.js')], env: env as Record<string, string> }));
 });
@@ -120,11 +116,16 @@ test('a new agent must be approved by the user, then each new site', async () =>
     const first = stdio.callTool({ name: 'tabs_context', arguments: {} }) as Promise<CallResult>;
     expect(await answerPopup('Allow')).toMatch(/nova-e2e wants to use your browser/);
     const tabs = JSON.parse(text(await first));
-    const tabId = tabs.tabs.find((tab: { url: string }) => tab.url.startsWith(base)).tabId;
+    // Nova works in a new empty tab of its own.
+    expect(tabs.tabs.map((tab: { url: string }) => tab.url)).toEqual(['about:blank']);
+    const tabId = tabs.tabs[0].tabId;
 
-    const read = stdio.callTool({ name: 'read_page', arguments: { tabId } }) as Promise<CallResult>;
+    const opened = stdio.callTool({ name: 'navigate', arguments: { tabId, url: `${base}/index.html` } }) as Promise<CallResult>;
     expect(await answerPopup('Allow')).toContain(`nova-e2e: let Nova use ${base}?`);
-    const tree = text(await read);
+    expect((await opened).isError).toBeFalsy();
+    page = context.pages().find((p) => p.url() === `${base}/index.html`)!;
+
+    const tree = text(await stdio.callTool({ name: 'read_page', arguments: { tabId } }) as CallResult);
     const ref = tree.match(/button "Increment" \[(ref_\d+)\]/)?.[1];
     expect(ref).toBeTruthy();
 

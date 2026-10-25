@@ -61,9 +61,15 @@ test.beforeAll(async () => {
     await page.goto(`${base}/index.html`);
     await page.bringToFront();
 
+    // Nova starts in a new empty tab and leaves the user's tabs alone…
+    const started = JSON.parse(text(await tool('tabs_context'))) as { tabs: Array<{ tabId: number; url: string }> };
+    expect(started.tabs.map((tab) => tab.url), 'Nova starts in its own empty tab').toEqual(['about:blank']);
+    // …until the user hands one over ("Use this tab").
+    await page.bringToFront();
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/add-current' }));
     const context0 = JSON.parse(text(await tool('tabs_context'))) as { tabs: Array<{ tabId: number; url: string }> };
     const fixtureTab = context0.tabs.find((tab) => tab.url.startsWith(base));
-    expect(fixtureTab, 'fixture tab joins the Nova group').toBeTruthy();
+    expect(fixtureTab, 'the handed-over tab joins the Nova group').toBeTruthy();
     tabId = fixtureTab!.tabId;
 });
 
@@ -291,4 +297,17 @@ test('a screenshot in the panel opens in a zoomable viewer', async () => {
     await panel.keyboard.press('Escape');
     await expect(viewer).toBeHidden();
     await panel.evaluate(() => chrome.storage.local.clear());
+});
+
+// Last: it ends the group the other tests use.
+test('a new chat closes the tabs Nova opened and gives the user\'s tabs back', async () => {
+    const tabs = JSON.parse(text(await tool('tabs_context'))) as { tabs: Array<{ tabId: number; url: string }> };
+    const novaTab = tabs.tabs.find((tab) => tab.url === 'about:blank')!.tabId;
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/release' }));
+    const state = await panel.evaluate(async ([nova, user]) => ({
+        novaOpen: await chrome.tabs.get(nova).then(() => true, () => false),
+        userGroup: (await chrome.tabs.get(user)).groupId
+    }), [novaTab, tabId] as const);
+    expect(state).toEqual({ novaOpen: false, userGroup: -1 });
+    expect(page.isClosed()).toBe(false);
 });

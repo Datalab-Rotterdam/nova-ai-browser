@@ -1,9 +1,13 @@
 /**
  * The agent works only in its own tab group, so the user can see (and keep apart) which tabs
- * Nova controls. The group id is kept in session storage to survive service worker restarts.
+ * Nova controls. The group starts with a new empty tab: the user's tabs join only when they hand
+ * one over ("Use this tab"). When the chat ends, the tabs Nova opened are closed and the user's
+ * are ungrouped. Group id and opened tabs are kept in session storage to survive service worker
+ * restarts.
  */
 
 const GROUP_KEY = 'novaGroupId';
+const OPENED_KEY = 'novaOpenedTabs';
 const GROUP_TITLE = 'Nova';
 
 export interface TabInfo {
@@ -26,10 +30,6 @@ async function storedGroupId(): Promise<number | undefined> {
     }
 }
 
-function isControllableUrl(url: string | undefined): boolean {
-    return !!url && /^(https?|file):/.test(url);
-}
-
 async function createGroup(tabIds: [number, ...number[]], windowId?: number): Promise<number> {
     const groupId = await chrome.tabs.group({ tabIds, ...(windowId !== undefined ? { createProperties: { windowId } } : {}) });
     await chrome.tabGroups.update(groupId, { title: GROUP_TITLE, color: 'purple' });
@@ -37,17 +37,35 @@ async function createGroup(tabIds: [number, ...number[]], windowId?: number): Pr
     return groupId;
 }
 
-/** Returns the Nova group, creating it around the current tab (or a new tab) when missing. */
+async function openedTabs(): Promise<number[]> {
+    return ((await chrome.storage.session.get(OPENED_KEY))[OPENED_KEY] as number[] | undefined) ?? [];
+}
+
+async function rememberOpened(tabId: number): Promise<void> {
+    await chrome.storage.session.set({ [OPENED_KEY]: [...await openedTabs(), tabId] });
+}
+
+/** Returns the Nova group, creating it around a new empty tab when missing. */
 export async function ensureGroup(): Promise<number> {
     const existing = await storedGroupId();
     if (existing !== undefined) return existing;
 
     const [current] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    if (current?.id !== undefined && isControllableUrl(current.url) && current.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
-        return createGroup([current.id]);
-    }
     const tab = await chrome.tabs.create({ url: 'about:blank', active: true, windowId: current?.windowId });
+    await rememberOpened(tab.id!);
     return createGroup([tab.id!], tab.windowId);
+}
+
+/** Ends the group: closes the tabs Nova opened and gives the user's tabs back ungrouped. */
+export async function releaseGroup(): Promise<void> {
+    const groupId = await storedGroupId();
+    const opened = new Set(await openedTabs());
+    await chrome.storage.session.remove([GROUP_KEY, OPENED_KEY]);
+    if (groupId === undefined) return;
+    const tabIds = (await chrome.tabs.query({ groupId })).map((tab) => tab.id!);
+    const users = tabIds.filter((id) => !opened.has(id));
+    if (users.length) await chrome.tabs.ungroup(users as [number, ...number[]]);
+    await chrome.tabs.remove(tabIds.filter((id) => opened.has(id)));
 }
 
 /** Adds a tab the user picked (e.g. the side panel's "Use this tab") to the group. */
@@ -99,6 +117,7 @@ export async function createTab(url?: string): Promise<chrome.tabs.Tab> {
     const groupId = await ensureGroup();
     const [first] = await chrome.tabs.query({ groupId });
     const tab = await chrome.tabs.create({ url: url ?? 'about:blank', active: true, windowId: first?.windowId });
+    await rememberOpened(tab.id!);
     await chrome.tabs.group({ groupId, tabIds: [tab.id!] });
     return tab;
 }

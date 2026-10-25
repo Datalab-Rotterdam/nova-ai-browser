@@ -1,6 +1,6 @@
 import { errorResult, modelCapabilities, type PanelEvent, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { NovaAI, NovaAIError, type ChatMessage, type ModelResponse } from '@datalabrotterdam/nova-sdk';
-import { answerPermission, callTool, setAgentRunning } from '../lib/bridge';
+import { answerPermission, callTool, releaseTabs, setAgentRunning } from '../lib/bridge';
 import { latestSession, saveSession } from '../lib/sessions';
 import { saveSettings, type Settings } from '../lib/settings';
 import { NovaBrowserAgent, type ToolCall } from './agent/loop';
@@ -144,6 +144,7 @@ export class ChatSession {
         this.restoredHistory = undefined;
         this.sessionId = crypto.randomUUID();
         this.createdAt = Date.now();
+        void releaseTabs();
     }
 
     stop(reason?: string): void {
