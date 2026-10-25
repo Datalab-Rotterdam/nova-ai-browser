@@ -1,3 +1,17 @@
+# [1.2.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.1.0...v1.2.0) (2026-10-25)
+
+
+### Bug Fixes
+
+* **extension:** fall back to text tool calls only when tools are rejected ([e7acb4b](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/e7acb4b4a12a587a08f59c375e74f3897c9a4960))
+* **extension:** work in a new, empty tab group and close it when the chat ends ([fcd2fdf](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/fcd2fdfb0e400ddabd8fa80858dfa4f582551554))
+* **protocol:** parse Qwen3-Coder XML tool calls ([7912311](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/7912311c8adbbb8bd8599802b389470438258cfd))
+
+
+### Features
+
+* **extension:** keep the conversation inside the model's context window ([3bdc475](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/3bdc475c5a6e883138b12080bc4f27bc3b5ac623))
+
 # [1.1.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.0.0...v1.1.0) (2026-10-25)
 
 
