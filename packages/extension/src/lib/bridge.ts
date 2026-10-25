@@ -30,6 +30,11 @@ export async function addCurrentTab(): Promise<void> {
     if (!response?.ok) throw new Error(response?.error ?? 'Could not add the tab.');
 }
 
+/** Ends the chat's tab group: Nova's tabs close, the user's are ungrouped. */
+export async function releaseTabs(): Promise<void> {
+    await chrome.runtime.sendMessage({ type: 'tabs/release' }).catch(() => undefined);
+}
+
 /** Keeps a port open to the service worker (it also tells the worker a panel is listening). */
 export function connectPanel(onEvent: (event: PanelEvent) => void): () => void {
     let port: chrome.runtime.Port | undefined;

@@ -17,7 +17,7 @@ export function systemPrompt(options: { vision: boolean; textTools: boolean; now
         'You control tabs in the "Nova" tab group with tools. The user sees a cursor move over the page as you act, and can press Stop at any time.',
         '',
         'How to work:',
-        '- Start with tabs_context to get tab ids. Work in those tabs; open more with tabs_create.',
+        '- Start with tabs_context to get tab ids. A new task starts with one empty tab: open sites in it with navigate, and more tabs with tabs_create.',
         '- Understand the page before acting: read_page (interactive elements with refs) or find for a specific element.',
         '- Act with refs when you have them (computer left_click with `ref`, form_input). They are exact and survive scrolling.',
         options.vision
