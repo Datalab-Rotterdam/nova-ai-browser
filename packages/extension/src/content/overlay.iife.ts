@@ -3,6 +3,8 @@
  * real (CDP) input event is sent, a click ripple, an action label, a glow around the viewport
  * and a Stop button. Everything lives in a closed shadow root with pointer-events: none, so
  * page styles cannot break it and it never intercepts the agent's or the user's input.
+ * While active, the tab's favicon becomes the Nova mark, so the tab strip shows which tabs
+ * Nova is using.
  */
 import type { OverlayMessage } from '@datalabrotterdam/nova-ai-browser-protocol';
 import markSource from '../assets/nova-mark.svg?raw';
@@ -14,12 +16,18 @@ declare global {
 }
 
 const HOST_ID = 'nova-ai-overlay-host';
+const FAVICON_ID = 'nova-ai-favicon';
 
 /** The Nova mark, recolored to follow `currentColor`. */
 const MARK_SVG = markSource
     .replace(/<\?xml[^>]*>|<!DOCTYPE[^>]*>/g, '')
     .replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="currentColor"')
     .replace(/\swidth="[^"]*"\s+height="[^"]*"/, '');
+
+/** The Nova mark on a purple disc, as a favicon. */
+const FAVICON_URL = `data:image/svg+xml,${encodeURIComponent(markSource
+    .replace(/<\?xml[^>]*>|<!DOCTYPE[^>]*>/g, '')
+    .replace(/(<svg[^>]*>)/, '$1<circle cx="360" cy="360" r="360" fill="#6633ee"/>'))}`;
 
 const CURSOR_SVG = `
 <svg class="arrow" viewBox="0 0 20 26" aria-hidden="true">
@@ -129,9 +137,22 @@ function setActive(value: boolean): void {
     active = value;
     const overlay = ensureOverlay();
     overlay.layer.classList.toggle('active', value);
+    setFavicon(value);
     if (!value) {
         setLabel(null);
     }
+}
+
+/** Shows the Nova mark as the tab's icon; removing it gives the page its own icon back. */
+function setFavicon(value: boolean): void {
+    document.getElementById(FAVICON_ID)?.remove();
+    if (!value) return;
+    const link = document.createElement('link');
+    link.id = FAVICON_ID;
+    link.rel = 'icon';
+    link.href = FAVICON_URL;
+    // The last icon link wins, so it goes at the end of <head>.
+    (document.head ?? document.documentElement).appendChild(link);
 }
 
 function setLabel(text: string | null | undefined): void {

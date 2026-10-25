@@ -98,6 +98,25 @@ test('click by ref fires a real click and shows the cursor', async () => {
     await expect(page.locator('#nova-ai-overlay-host')).toHaveCount(1);
 });
 
+test('tabs Nova is using show the Nova mark as favicon, until Nova is done', async () => {
+    const [second] = await Promise.all([
+        context.waitForEvent('page'),
+        tool('tabs_create', { url: `${base}/frame.html` })
+    ]);
+    await second.waitForLoadState();
+    const secondId = await panel.evaluate(async (url) => (await chrome.tabs.query({ url }))[0]?.id, `${base}/frame.html`);
+    await tool('read_page', { tabId });
+    await tool('read_page', { tabId: secondId });
+
+    const favicons = () => panel.evaluate(async (ids) => Promise.all(ids.map(async (id) => (await chrome.tabs.get(id)).favIconUrl ?? '')), [tabId, secondId!]);
+    await expect.poll(async () => (await favicons()).map((url) => url.startsWith('data:image/svg+xml'))).toEqual([true, true]);
+
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'agent/running', running: false }));
+    await expect(page.locator('#nova-ai-favicon')).toHaveCount(0);
+    await expect(second.locator('#nova-ai-favicon')).toHaveCount(0);
+    await tool('tabs_close', { tabId: secondId });
+});
+
 test('screenshot coordinates map back to CSS pixels', async () => {
     const shot = await tool('computer', { tabId, action: 'screenshot' });
     const image = shot.content.find((block) => block.type === 'image');
