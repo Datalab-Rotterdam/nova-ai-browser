@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { identifyClient } from '@datalabrotterdam/nova-ai-browser-protocol';
-import { detectClient } from '../src/call';
+import { callerClient, detectClient } from '../src/call';
 
 describe('identifyClient', () => {
     it('maps names agents report in MCP initialize', () => {
@@ -31,5 +31,12 @@ describe('detectClient (skill script)', () => {
 
     it('honors NOVA_BROWSER_CLIENT', () => {
         expect(detectClient(['claude'], 'Nova AI CLI')).toEqual({ id: 'nova-ai-cli', name: 'Nova AI CLI' });
+    });
+});
+
+describe('callerClient', () => {
+    it('marks calls the app already approved', () => {
+        expect(callerClient({ NOVA_BROWSER_CLIENT: 'Visual Studio Code', NOVA_BROWSER_PREAPPROVED: '1' })).toEqual({ id: 'vscode', name: 'Visual Studio Code', preApproved: true });
+        expect(callerClient({ NOVA_BROWSER_CLIENT: 'Visual Studio Code' }).preApproved).toBeUndefined();
     });
 });

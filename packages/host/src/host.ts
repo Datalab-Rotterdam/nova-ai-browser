@@ -135,7 +135,8 @@ export async function runHost(extensionOrigin: string): Promise<void> {
                     return;
                 }
                 const client = request.params.client ?? identifyClient(undefined);
-                reply({ result: await callTool(request.params.name, request.params.args ?? {}, identifyClient(client.name)) });
+                const known = { ...identifyClient(client.name), ...(client.preApproved === true ? { preApproved: true } : {}) };
+                reply({ result: await callTool(request.params.name, request.params.args ?? {}, known) });
             } else {
                 reply({ error: 'Unknown method.' });
             }

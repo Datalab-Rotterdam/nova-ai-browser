@@ -89,7 +89,13 @@ export function detectClient(names: string[] = ancestorNames(), override = proce
     return app ? identifyClient(app) : { id: 'terminal', name: 'A terminal command' };
 }
 
-export async function callHost(name: string, args: Record<string, unknown>, client: AgentClient = detectClient()): Promise<ToolResult | undefined> {
+/** NOVA_BROWSER_PREAPPROVED=1: the app running this command already had the user approve it. */
+export function callerClient(env: NodeJS.ProcessEnv = process.env): AgentClient {
+    const client = detectClient(undefined, env.NOVA_BROWSER_CLIENT);
+    return env.NOVA_BROWSER_PREAPPROVED === '1' ? { ...client, preApproved: true } : client;
+}
+
+export async function callHost(name: string, args: Record<string, unknown>, client: AgentClient = callerClient()): Promise<ToolResult | undefined> {
     const info = pickHost();
     if (!info) return undefined;
     let rpc: RpcClient;

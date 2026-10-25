@@ -80,7 +80,7 @@ async function openPort(): Promise<void> {
         } else if (message.type === 'tool/call' && typeof message.id === 'string') {
             const id = message.id;
             const reported = message.client as Partial<AgentClient> | undefined;
-            const client = identifyClient(reported?.name);
+            const client = { ...identifyClient(reported?.name), ...(reported?.preApproved === true ? { preApproved: true } : {}) };
             void runner(String(message.name), (message.args ?? {}) as Record<string, unknown>, client).then((result) => {
                 // userImage is for the side panel only; agents get the content.
                 notifyHost({ type: 'tool/result', id, result: { content: result.content, isError: result.isError } });
