@@ -2,7 +2,7 @@ import { COMPUTER_ACTIONS, textResult, type Point, type ResolvedRef, type ToolRe
 import { loadSettings } from '../../lib/settings';
 import { overlay, pageRequest } from '../content';
 import { click, drag, hover, parseModifiers, pressKeys, scroll, typeText, type MouseButton } from '../input';
-import { geometryFor, screenshot, toCssPoint, zoom } from '../screenshot';
+import { fullPageScreenshot, geometryFor, screenshot, toCssPoint, zoom } from '../screenshot';
 import { settle } from '../tabs';
 import type { ToolContext } from './context';
 
@@ -99,6 +99,22 @@ export async function computer(ctx: ToolContext, args: Record<string, unknown>):
     switch (action) {
         case 'screenshot': {
             await overlay(tabId, { type: 'overlay/label', label: 'Looking at the page' });
+            if (args.full_page === true || args.full_page === 'true') {
+                const page = await fullPageScreenshot(tabId, { showCursor: settings.showCursorInScreenshots });
+                const cut = page.truncated ? ` Only the top ${page.geometry.cssHeight}px of the ${page.pageHeight}px page fit.` : '';
+                return {
+                    content: [
+                        { type: 'text', text: `Full-page screenshot of tab ${tabId} (page ${page.pageWidth}x${page.pageHeight} CSS px), image ${page.geometry.imageWidth}x${page.geometry.imageHeight}px.${cut} For looking only: do not click by its coordinates; use refs or take a normal screenshot. The user sees it at full resolution.` },
+                        { type: 'image', data: page.data, mimeType: page.mimeType }
+                    ],
+                    userImage: {
+                        type: 'image',
+                        data: page.full.data,
+                        mimeType: page.full.mimeType,
+                        note: `You see the full image (${page.full.width}×${page.full.height} px). Nova only got a scaled-down copy (${page.geometry.imageWidth}×${page.geometry.imageHeight} px) and can miss small text or details.${cut}`
+                    }
+                };
+            }
             const capture = await screenshot(tabId, { showCursor: settings.showCursorInScreenshots });
             return screenshotResult(capture, `Screenshot of tab ${tabId}.`);
         }

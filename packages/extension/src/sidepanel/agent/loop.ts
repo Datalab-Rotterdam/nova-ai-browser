@@ -48,13 +48,15 @@ export interface AgentOptions {
      * after the first; they join the conversation as user messages.
      */
     takeSteering?(): string[];
+    /** The conversation so far, e.g. of a restored chat or the agent before a model switch. */
+    history?: ChatMessage[];
 }
 
 type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
 
 export class NovaBrowserAgent {
     private readonly client: NovaAI;
-    private readonly history: ChatMessage[] = [];
+    public readonly history: ChatMessage[];
     private textTools = false;
     private lastSignature = '';
     private repeats = 0;
@@ -62,9 +64,12 @@ export class NovaBrowserAgent {
     public constructor(private readonly options: AgentOptions) {
         // Bind fetch: extension pages throw "Illegal invocation" for an unbound window.fetch.
         this.client = new NovaAI({ apiKey: options.apiKey, baseUrl: options.baseUrl, fetch: (input, init) => fetch(input, init) });
+        this.history = options.history ?? [];
     }
 
     public async run(prompt: string, events: AgentEvents, signal: AbortSignal): Promise<void> {
+        // A restored chat may end in tool calls that never ran (the panel closed mid-step).
+        this.answerOpenToolCalls();
         this.history.push({ role: 'user', content: prompt });
         try {
             await this.loop(events, signal);
@@ -204,7 +209,7 @@ export class NovaBrowserAgent {
 
         const messages: ChatMessage[] = [
             { role: 'system', content: systemPrompt({ vision: this.options.vision, textTools: this.textTools, now: new Date() }) },
-            ...pruneImages(this.history)
+            ...pruneImages(this.history, this.options.vision ? KEPT_IMAGES : 0)
         ];
 
         const stream = this.client.chat.completions.stream(
@@ -238,9 +243,9 @@ export class NovaBrowserAgent {
     }
 }
 
-/** Copies the history, replacing all but the newest images with a short placeholder. */
-function pruneImages(history: readonly ChatMessage[]): ChatMessage[] {
-    let remaining = KEPT_IMAGES;
+/** Copies the history, replacing all but the newest `kept` images with a short placeholder. */
+function pruneImages(history: readonly ChatMessage[], kept: number): ChatMessage[] {
+    let remaining = kept;
     const result = [...history];
     for (let i = result.length - 1; i >= 0; i--) {
         const message = result[i];

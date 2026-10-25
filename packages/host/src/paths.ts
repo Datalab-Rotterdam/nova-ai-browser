@@ -8,9 +8,14 @@ export const HOST_NAME = 'nl.datalabrotterdam.nova_ai_browser';
 /** Development build ID (pinned by the manifest key). Store builds pass --extension-id. */
 export const DEV_EXTENSION_ID = 'lnoimoijcjpcebjepmenoepmhbdgnipo';
 
-/** Where the host keeps its state. Override with NOVA_AI_BROWSER_HOME (used by tests). */
+/** The Nova home shared with nova-ai-vscode and nova-ai-cli. Override with NOVA_AI_HOME. */
+export function novaHome(): string {
+    return process.env.NOVA_AI_HOME?.trim() || join(homedir(), '.nova-ai');
+}
+
+/** Where the host keeps its state, inside the Nova home. Override with NOVA_AI_BROWSER_HOME (used by tests). */
 export function homeDir(): string {
-    return process.env.NOVA_AI_BROWSER_HOME ?? join(homedir(), '.nova-ai-browser');
+    return process.env.NOVA_AI_BROWSER_HOME ?? join(novaHome(), 'browser');
 }
 
 export function ensureHomeDir(): string {
@@ -28,9 +33,9 @@ export function hostInfoPath(pid: number): string {
     return join(hostsDir(), `${pid}.json`);
 }
 
-/** Written by versions before per-host files; removed when seen. */
-export function legacyHostInfoPath(): string {
-    return join(homeDir(), 'host.json');
+/** Copies of the extension's saved chats, one JSON file each (see sessions.ts). */
+export function sessionsDir(): string {
+    return join(homeDir(), 'sessions');
 }
 
 export function logPath(): string {

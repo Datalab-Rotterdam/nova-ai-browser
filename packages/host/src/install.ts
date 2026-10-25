@@ -2,10 +2,10 @@
  * Registers the native messaging host with Chromium-based browsers for the current user, the
  * way Claude Code does for its browser extension:
  *
- * - The host's files are copied to `~/.nova-ai-browser/host/<version>/`, so the registration
+ * - The host's files are copied to `~/.nova-ai/browser/host/<version>/`, so the registration
  *   never points into a folder that an app update replaces (VS Code extension folders change
  *   with every version).
- * - A generated wrapper, `~/.nova-ai-browser/bin/nova-ai-browser-host`, runs that copy with an
+ * - A generated wrapper, `~/.nova-ai/browser/bin/nova-ai-browser-host`, runs that copy with an
  *   absolute Node path (browsers start hosts without the user's shell PATH).
  * - A manifest pointing at the wrapper goes into every installed browser's NativeMessagingHosts
  *   folder (registry keys on Windows).

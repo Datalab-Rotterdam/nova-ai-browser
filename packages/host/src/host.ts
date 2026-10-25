@@ -20,6 +20,7 @@ import { NativeChannel } from './native';
 import { execFileSync } from 'node:child_process';
 import { ensureHomeDir, hostInfoPath, hostsDir, logPath, socketPath, type HostInfo } from './paths';
 import { onJsonLines, type RpcRequest, type RpcResponse } from './rpc';
+import { deleteSession, saveSession, syncSessions } from './sessions';
 import { VERSION } from './version';
 
 /** Long enough for a permission prompt the user has to answer. */
@@ -90,6 +91,15 @@ export async function runHost(extensionOrigin: string): Promise<void> {
             }
         } else if (message.type === 'ping') {
             channel.send({ type: 'pong' });
+        } else if (message.type === 'session/save' || message.type === 'session/delete' || message.type === 'sessions/sync') {
+            try {
+                if (message.type === 'session/save') saveSession(message.session);
+                else if (message.type === 'session/delete') deleteSession(message.id);
+                else syncSessions(message.sessions);
+            } catch (error) {
+                // The browser keeps the chats; a failed copy must not stop the host.
+                log(`${message.type} failed: ${(error as Error).message}`);
+            }
         }
     });
 

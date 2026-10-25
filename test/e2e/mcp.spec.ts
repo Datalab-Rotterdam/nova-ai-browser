@@ -218,3 +218,14 @@ test('pressing Stop on the page blocks external agents', async () => {
     expect(refused.isError).toBe(true);
     expect(text(refused)).toContain('pressed Stop');
 });
+
+test('saved chats are mirrored to the host as files', async () => {
+    const [worker] = context.serviceWorkers();
+    const file = join(home, 'sessions', 'e2e-chat.json');
+    await worker.evaluate(() => chrome.storage.local.set({ 'session:e2e-chat': { id: 'e2e-chat', title: 'Mirrored', items: [], history: [] } }));
+    const saved = await waitFor(() => existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined, 5_000, 'the session file');
+    expect(saved.title).toBe('Mirrored');
+
+    await worker.evaluate(() => chrome.storage.local.remove('session:e2e-chat'));
+    await waitFor(() => existsSync(file) ? undefined : true, 5_000, 'the session file to be removed');
+});

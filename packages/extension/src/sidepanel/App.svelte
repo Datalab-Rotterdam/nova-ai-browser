@@ -10,6 +10,7 @@
     import PermissionCard from './components/PermissionCard.svelte';
     import Settings from './components/Settings.svelte';
     import ToolCard from './components/ToolCard.svelte';
+    import ImageViewer from './components/ImageViewer.svelte';
     import ToolTester from './components/ToolTester.svelte';
     import ConnectView from './views/ConnectView.svelte';
     import WelcomeView from './views/WelcomeView.svelte';
@@ -34,6 +35,7 @@
 
     void loadSettings().then(async (value) => {
         settings = value;
+        await chat.restore().catch(() => undefined);
         loaded = true;
         await chat.loadModels(value);
     });
@@ -212,6 +214,8 @@
         {/if}
     </section>
 {/if}
+
+<ImageViewer />
 
 <style lang="scss">
   .loader {

@@ -33,7 +33,7 @@ export function hostInfoIn(home: string): { file: string; info: { mcpUrl: string
 /**
  * Environment for a test browser. Browsers find the user's real host registration (on macOS
  * from the account, whatever HOME says); a separate Nova AI Browser home makes the host
- * they start use temporary files, never the user's real ~/.nova-ai-browser.
+ * they start use temporary files, never the user's real ~/.nova-ai/browser.
  */
 export function isolatedEnv(root: string, extra: Record<string, string> = {}): NodeJS.ProcessEnv {
     return { ...process.env, HOME: root, NOVA_AI_BROWSER_HOME: join(root, 'home'), NOVA_AI_HOME: join(root, 'nova'), ...extra };

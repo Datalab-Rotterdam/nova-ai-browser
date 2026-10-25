@@ -4,6 +4,7 @@ import { answerPermission, clearSessionPermissions, denyAllPending, setPanelBroa
 import { forgetTab, hideAll, isRunActive, restoreAfterNavigation, setRunActive } from './presence';
 import { forgetGeometry } from './screenshot';
 import { addTabToGroup, isInGroup } from './tabs';
+import { sessionIdOf } from '../lib/sessions';
 import { onSettingsChanged } from '../lib/settings';
 import { connectHost, disconnectHost, hostStatus, notifyHost, setToolRunner } from './native';
 import { blockExternalCallers, callTool } from './tools';
@@ -40,6 +41,15 @@ setToolRunner((name, args, client) => callTool({ name, args, caller: 'mcp', clie
 void connectHost();
 onSettingsChanged((settings) => {
     void (settings.externalAgents ? connectHost() : disconnectHost());
+});
+
+// Saved chats are mirrored to the host, so agents can read them from disk (see lib/sessions.ts).
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    for (const [key, change] of Object.entries(changes)) {
+        const id = sessionIdOf(key);
+        if (id) notifyHost(change.newValue ? { type: 'session/save', session: change.newValue } : { type: 'session/delete', id });
+    }
 });
 
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { liveHosts, pickHost } from '../src/hosts';
-import { hostInfoPath, hostsDir, legacyHostInfoPath, type HostInfo } from '../src/paths';
+import { hostInfoPath, hostsDir, type HostInfo } from '../src/paths';
 
 const host = (pid: number, startedAt: string, browser?: string): HostInfo => ({
     pid, browser, version: '0.1.0', socket: join(hostsDir(), `${pid}.sock`), mcpUrl: 'http://127.0.0.1:1/mcp', token: 't',
@@ -27,12 +27,10 @@ describe('running hosts (one per browser)', () => {
         for (const info of [host(11, '2026-10-06T08:00:00Z', 'Microsoft Edge'), host(22, '2026-10-06T09:00:00Z', 'Google Chrome'), host(33, '2026-10-06T10:00:00Z')]) {
             writeFileSync(hostInfoPath(info.pid), JSON.stringify(info));
         }
-        writeFileSync(legacyHostInfoPath(), '{}');
 
         const hosts = liveHosts((pid) => pid !== 33);
         expect(hosts.map((info) => info.browser)).toEqual(['Google Chrome', 'Microsoft Edge']);
         expect(existsSync(hostInfoPath(33))).toBe(false);
-        expect(existsSync(legacyHostInfoPath())).toBe(false);
     });
 
     it('picks the browser that connected last, or the pinned one', () => {

@@ -79,7 +79,8 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
             '* Prefer `ref` from read_page or find over coordinates: it is exact and survives scrolling.',
             '* Click in the center of elements. After a click that navigates, take a new screenshot or read_page.',
             '* `key` takes space-separated combos like "Enter", "ctrl+a", "cmd+shift+k" (cmd is mapped to ctrl off macOS).',
-            '* `zoom` returns a close-up of `region` [x0, y0, x1, y1] for reading small text.'
+            '* `zoom` returns a close-up of `region` [x0, y0, x1, y1] for reading small text.',
+            '* `screenshot` with `full_page: true` captures the whole scrollable page in one image (for looking, not for click coordinates).'
         ].join('\n'),
         inputSchema: {
             type: 'object',
@@ -93,6 +94,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
                 modifiers: { type: 'string', description: 'Modifier keys held during a click, e.g. "shift" or "ctrl+shift".' },
                 scroll_direction: { type: 'string', enum: ['up', 'down', 'left', 'right'] },
                 scroll_amount: { type: 'number', description: 'Scroll steps (default 3). One step is about 100px.' },
+                full_page: { type: 'boolean', description: 'With screenshot: capture the whole scrollable page instead of the visible part.' },
                 region: { type: 'array', items: { type: 'number' }, minItems: 4, maxItems: 4, description: '[x0, y0, x1, y1] for zoom.' },
                 duration: { type: 'number', description: 'Seconds for `wait` (max 10).' },
                 repeat: { type: 'number', description: 'How many times to press the key combos (default 1).' }

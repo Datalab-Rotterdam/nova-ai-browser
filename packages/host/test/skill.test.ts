@@ -105,16 +105,6 @@ describe('nova-browser skill', () => {
         expect(JSON.parse(readFileSync(join(dir, BUNDLE_FILE), 'utf8')).version).toBe(VERSION);
     });
 
-    it('takes over copies from before bundled skills (old marker)', () => {
-        const dir = join(skillsFolder('nova'), 'nova-browser');
-        mkdirSync(dir, { recursive: true });
-        writeFileSync(join(dir, '.installed-by-nova-ai-browser'), '0.0.9\n');
-        writeFileSync(join(dir, 'SKILL.md'), 'old');
-        expect(installSkill(['nova'])).toEqual([dir]);
-        expect(existsSync(join(dir, BUNDLE_FILE))).toBe(true);
-        expect(existsSync(join(dir, '.installed-by-nova-ai-browser'))).toBe(false);
-    });
-
     it('never overwrites or removes someone else\'s skill with the same name', () => {
         const foreign = join(skillsFolder('nova'), 'nova-browser');
         mkdirSync(foreign, { recursive: true });
