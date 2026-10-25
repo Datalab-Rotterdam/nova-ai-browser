@@ -54,6 +54,8 @@ export interface AgentOptions {
     baseUrl: string;
     model: string;
     vision: boolean;
+    /** `reasoning_effort` sent with every request, for models that accept it. */
+    effort?: string;
     maxRounds: number;
     /** The model's context window in tokens, when it advertises one. */
     contextWindow?: number;
@@ -277,7 +279,12 @@ export class NovaBrowserAgent {
         ];
 
         const stream = this.client.chat.completions.stream(
-            { model: this.options.model, messages, ...(this.textTools ? {} : tools.payload) },
+            {
+                model: this.options.model,
+                messages,
+                ...(this.textTools ? {} : tools.payload),
+                ...(this.options.effort ? { reasoning_effort: this.options.effort } : {})
+            },
             { signal }
         );
         for await (const event of stream) {

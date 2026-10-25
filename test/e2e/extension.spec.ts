@@ -235,6 +235,38 @@ test('the panel reopens the last chat, with open prompts expired', async () => {
     await panel.evaluate(() => chrome.storage.local.clear());
 });
 
+test('the model menu sets the reasoning effort sent to Nova', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    await panel.route(`${base}/v1/**`, async (route) => {
+        if (route.request().url().endsWith('/models')) {
+            return route.fulfill({ json: { object: 'list', data: [
+                { id: 'thinker', object: 'model', created: 1, owned_by: 'e2e', name: 'Thinker', capabilities: ['tools'], reasoning_efforts: ['low', 'medium', 'high'] }
+            ] } });
+        }
+        requests.push(route.request().postDataJSON());
+        const chunk = { object: 'chat.completion.chunk', choices: [{ index: 0, delta: { content: 'Done thinking.' }, finish_reason: 'stop' }] };
+        return route.fulfill({ headers: { 'content-type': 'text/event-stream' }, body: `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n` });
+    });
+    await panel.evaluate((baseUrl) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'thinker' } }), `${base}/v1`);
+    await panel.reload();
+
+    const chip = panel.getByRole('button', { name: 'Model' });
+    await expect(chip).toHaveText(/Thinker \(Medium\)/);
+    await chip.click();
+    await panel.getByRole('radio', { name: 'High' }).click();
+    await panel.keyboard.press('Escape');
+    await expect(chip).toHaveText(/Thinker \(High\)/);
+
+    await panel.getByRole('textbox', { name: 'Message Nova' }).fill('Hi');
+    await panel.getByRole('button', { name: 'Send' }).click();
+    await expect(panel.getByText('Done thinking.')).toBeVisible();
+    expect(requests[0]).toMatchObject({ model: 'thinker', reasoning_effort: 'high' });
+
+    await panel.unrouteAll();
+    await panel.evaluate(() => chrome.storage.local.clear());
+    await panel.reload();
+});
+
 test('full-page screenshot covers the whole page and leaves click coordinates alone', async () => {
     await page.evaluate(() => window.scrollTo(0, 0));
     const shot = await tool('computer', { tabId, action: 'screenshot', full_page: true });
