@@ -1,5 +1,16 @@
 import { TOOL_DEFINITIONS } from '@datalabrotterdam/nova-ai-browser-protocol';
 
+/** Asks for a summary of older turns when the conversation outgrows the context window. */
+export const COMPACTION_PROMPT =
+    'Summarize the conversation transcript below so the work can continue without it. ' +
+    'Write a compact, structured summary with these sections:\n' +
+    '- Goal: what the user asked for, including constraints and preferences.\n' +
+    '- Progress: what has been done, decisions made and why.\n' +
+    '- Pages: tabs and URLs visited, with what was found there.\n' +
+    '- Open: remaining steps, open questions and known problems.\n' +
+    'Keep exact names, URLs, values and error messages. Do not add anything that is not in the transcript.\n\n' +
+    '<transcript>\n{transcript}\n</transcript>';
+
 export function systemPrompt(options: { vision: boolean; textTools: boolean; now: Date }): string {
     const lines = [
         'You are Nova, an AI assistant that uses the user\'s Chromium browser to get tasks done.',
