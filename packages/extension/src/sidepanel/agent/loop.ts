@@ -7,10 +7,11 @@
  * - Screenshots go back as `image_url` parts for vision models. Only the newest few images
  *   stay in the history, older ones become a placeholder, to bound context size.
  */
-import { NovaAI, NovaAIError, type ChatMessage } from '@datalabrotterdam/nova-sdk';
+import { NovaAI, type ChatMessage } from '@datalabrotterdam/nova-sdk';
 import {
     ChatStreamParser,
     createToolPayload,
+    isToolCallingRejected,
     resultText,
     TOOL_DEFINITIONS,
     type ToolResult
@@ -180,7 +181,7 @@ export class NovaBrowserAgent {
         try {
             return await this.stream(events, signal);
         } catch (error) {
-            if (!this.textTools && error instanceof NovaAIError && (error.status === 400 || error.status === 422)) {
+            if (!this.textTools && isToolCallingRejected(error)) {
                 // The model or server does not accept native tools: describe them in the prompt instead.
                 this.textTools = true;
                 events.notice('This model does not support native tool calls; using text tool calls.');
