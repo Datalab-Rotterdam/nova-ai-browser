@@ -117,6 +117,30 @@ test('tabs Nova is using show the Nova mark as favicon, until Nova is done', asy
     await tool('tabs_close', { tabId: secondId });
 });
 
+test('clicking a pay button asks the user first, and a denial stops it', async () => {
+    await panel.evaluate(() => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', model: 'e2e-model', askBeforeActing: false } }));
+    await panel.reload();
+    const ref = refFor(text(await tool('read_page', { tabId })), /button "Pay now"/);
+    const click = (caller: string) => panel.evaluate(([n, a, c]) => chrome.runtime.sendMessage({ type: 'tool/call', name: n, args: a, caller: c }),
+        ['computer', { tabId, action: 'left_click', ref }, caller] as const) as Promise<ToolResult>;
+
+    const denied = click('sidepanel');
+    const card = panel.getByRole('group', { name: 'Confirm button "Pay now"' });
+    await expect(card.getByRole('button', { name: 'Always allow' })).toHaveCount(0);
+    await card.getByRole('button', { name: 'Deny' }).click();
+    expect((await denied).isError).toBe(true);
+    expect(text(await denied)).toContain('did not allow');
+    await expect(page.locator('#paid')).toHaveText('no');
+
+    const allowed = click('sidepanel');
+    await panel.getByRole('group', { name: 'Confirm button "Pay now"' }).last().getByRole('button', { name: 'Allow', exact: true }).click();
+    expect((await allowed).isError).toBeFalsy();
+    await expect(page.locator('#paid')).toHaveText('yes');
+
+    await panel.evaluate(() => chrome.storage.local.clear());
+    await panel.reload();
+});
+
 test('screenshot coordinates map back to CSS pixels', async () => {
     const shot = await tool('computer', { tabId, action: 'screenshot' });
     const image = shot.content.find((block) => block.type === 'image');

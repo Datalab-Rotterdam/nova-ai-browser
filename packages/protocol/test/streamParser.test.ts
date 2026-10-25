@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ChatStreamParser } from '../src/model/streamParser';
 import { createToolPayload } from '../src/model/toolNames';
 import { effortFor, hasThinkingSwitch, modelCapabilities, modelEfforts } from '../src/model/capabilities';
-import { TOOL_DEFINITIONS, isReadOnlyCall } from '../src/tools';
+import { TOOL_DEFINITIONS, isIrreversibleControl, isReadOnlyCall } from '../src/tools';
 
 function collect(chunks: ChatCompletionChunk[]) {
     const { names } = createToolPayload(TOOL_DEFINITIONS);
@@ -117,5 +117,19 @@ describe('Qwen3-Coder XML tool calls', () => {
     it('keeps values that are not JSON as text', () => {
         const out = collect([content('<tool_call><function=navigate><parameter=url>https://example.com/a b</parameter><parameter=tabId>7</parameter></function></tool_call>')]);
         expect(out.calls).toEqual([{ name: 'navigate', input: { url: 'https://example.com/a b', tabId: 7 } }]);
+    });
+});
+
+describe('isIrreversibleControl', () => {
+    it('flags controls that pay, send or delete, in English and Dutch', () => {
+        for (const description of ['button "Pay now"', 'button "Place order"', 'link "Delete account"', 'button "Send"', 'button "Afrekenen"', 'button "Bestelling plaatsen"', 'button "Verwijderen"']) {
+            expect(isIrreversibleControl(description), description).toBe(true);
+        }
+    });
+
+    it('leaves ordinary controls alone', () => {
+        for (const description of ['button "Increment"', 'link "Facebook"', 'textbox "Your name"', 'button "Payments overview page"', 'button "Accept cookies"']) {
+            expect(isIrreversibleControl(description), description).toBe(false);
+        }
     });
 });

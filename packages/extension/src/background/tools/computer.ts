@@ -3,6 +3,7 @@ import { loadSettings } from '../../lib/settings';
 import { overlay, pageRequest } from '../content';
 import { click, drag, hover, parseModifiers, pressKeys, scroll, typeText, type MouseButton } from '../input';
 import { fullPageScreenshot, geometryFor, screenshot, toCssPoint, zoom } from '../screenshot';
+import { confirmIrreversible } from '../permissions';
 import { settle } from '../tabs';
 import type { ToolContext } from './context';
 
@@ -82,6 +83,7 @@ export async function computer(ctx: ToolContext, args: Record<string, unknown>):
     if (action in CLICKS) {
         const spec = CLICKS[action];
         const where = await target(ctx, args);
+        await confirmIrreversible(ctx.tab.url ?? '', where.description, `computer ${action}`, ctx.caller, ctx.client);
         await click(tabId, where.point, {
             button: spec.button,
             clickCount: spec.clickCount,

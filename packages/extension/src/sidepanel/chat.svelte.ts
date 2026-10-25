@@ -14,8 +14,8 @@ export type ChatItem =
         kind: 'permission';
         id: number;
         requestId: string;
-        /** "site": may Nova use this site; "agent": may this external agent use the browser. */
-        subject: 'site' | 'agent';
+        /** "site": may Nova use this site; "agent": may this external agent use the browser; "action": may Nova use this control (pay, send, delete, …). */
+        subject: 'site' | 'agent' | 'action';
         /** The site's origin or the agent's name. */
         target: string;
         /** For site prompts on behalf of an external agent. */
@@ -179,7 +179,7 @@ export class ChatSession {
             case 'permission/request':
                 this.push(event.kind === 'agent'
                     ? { kind: 'permission', id: 0, requestId: event.id, subject: 'agent', target: event.client.name, tool: event.tool, summary: event.summary }
-                    : { kind: 'permission', id: 0, requestId: event.id, subject: 'site', target: event.origin, agent: event.agent, tool: event.tool, summary: event.summary });
+                    : { kind: 'permission', id: 0, requestId: event.id, subject: event.kind, target: event.origin, agent: event.agent, tool: event.tool, summary: event.summary });
                 break;
             case 'permission/resolved':
                 for (const item of this.items) {
@@ -192,7 +192,7 @@ export class ChatSession {
     async answer(item: Extract<ChatItem, { kind: 'permission' }>, decision: 'once' | 'always' | 'deny'): Promise<void> {
         item.answered = decision === 'deny' ? 'Denied'
             : decision === 'always' ? 'Always allowed'
-                : item.subject === 'agent' ? 'Allowed until the browser closes' : 'Allowed for this task';
+                : item.subject === 'agent' ? 'Allowed until the browser closes' : item.subject === 'action' ? 'Allowed' : 'Allowed for this task';
         await answerPermission(item.requestId, decision);
     }
 
