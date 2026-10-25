@@ -13,9 +13,13 @@ export function novaHome(): string {
     return process.env.NOVA_AI_HOME?.trim() || join(homedir(), '.nova-ai');
 }
 
-/** Where the host keeps its state, inside the Nova home. Override with NOVA_AI_BROWSER_HOME (used by tests). */
+/**
+ * Where the host keeps its state. Override with NOVA_AI_BROWSER_HOME (used by tests).
+ * Not under NOVA_AI_HOME: the browser starts the host without the environment the installer and
+ * the agents have, and they must all agree on this folder (hosts/, screenshots/, sessions/).
+ */
 export function homeDir(): string {
-    return process.env.NOVA_AI_BROWSER_HOME ?? join(novaHome(), 'browser');
+    return process.env.NOVA_AI_BROWSER_HOME ?? join(homedir(), '.nova-ai', 'browser');
 }
 
 export function ensureHomeDir(): string {

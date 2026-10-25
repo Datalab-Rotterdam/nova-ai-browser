@@ -1,5 +1,5 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sessionsDir } from '../src/paths';
@@ -34,11 +34,11 @@ describe('saved browser sessions', () => {
         expect(existsSync(sessionsDir())).toBe(false);
     });
 
-    it('lives in the Nova home by default', () => {
+    it('lives in ~/.nova-ai/browser, whatever NOVA_AI_HOME says', () => {
         delete process.env.NOVA_AI_BROWSER_HOME;
         const nova = process.env.NOVA_AI_HOME;
         process.env.NOVA_AI_HOME = home;
-        expect(sessionsDir()).toBe(join(home, 'browser', 'sessions'));
+        expect(sessionsDir()).toBe(join(homedir(), '.nova-ai', 'browser', 'sessions'));
         if (nova === undefined) delete process.env.NOVA_AI_HOME;
         else process.env.NOVA_AI_HOME = nova;
     });
