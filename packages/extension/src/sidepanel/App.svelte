@@ -12,10 +12,11 @@
     import ToolCard from './components/ToolCard.svelte';
     import ImageViewer from './components/ImageViewer.svelte';
     import ToolTester from './components/ToolTester.svelte';
+    import ChatsView from './views/ChatsView.svelte';
     import ConnectView from './views/ConnectView.svelte';
     import WelcomeView from './views/WelcomeView.svelte';
 
-    type View = 'chat' | 'tools' | 'settings';
+    type View = 'chat' | 'chats' | 'tools' | 'settings';
 
     const chat = new ChatSession();
     let settings = $state<SettingsData>(DEFAULT_SETTINGS);
@@ -85,6 +86,10 @@
         }
     }
 
+    async function openChat(id: string) {
+        if (id === chat.id || await chat.open(id)) view = 'chat';
+    }
+
     function flash(text: string) {
         toast = text;
         setTimeout(() => (toast = undefined), 2500);
@@ -113,10 +118,11 @@
     <section class="chat">
         <header>
             <span class="nova-mark header-mark" style:--mark-url={`url("${markUrl}")`} aria-hidden="true"></span>
-            <span class="title">{view === 'settings' ? 'Settings' : view === 'tools' ? 'Tool tester' : 'Nova'}</span>
+            <span class="title">{view === 'settings' ? 'Settings' : view === 'tools' ? 'Tool tester' : view === 'chats' ? 'Chats' : 'Nova'}</span>
             {#if view === 'chat'}
                 <button class="nova-icon-button codicon codicon-add" title="New chat" aria-label="New chat" disabled={!chat.items.length} onclick={() => chat.newChat()}></button>
             {/if}
+            <button class="nova-icon-button codicon codicon-history" title="Chats" aria-label="Chats" aria-pressed={view === 'chats'} onclick={() => toggle('chats')}></button>
             {#if DEV_TOOLS}
                 <button class="nova-icon-button codicon codicon-beaker" title="Tool tester" aria-label="Tool tester" aria-pressed={view === 'tools'} onclick={() => toggle('tools')}></button>
             {/if}
@@ -126,6 +132,11 @@
         {#if view === 'settings'}
             <div class="page">
                 <Settings {settings} models={chat.models} modelsError={chat.modelsError} onreloadmodels={() => chat.loadModels(settings)} onsignout={signOut} />
+            </div>
+        {:else if view === 'chats'}
+            <div class="page">
+                <ChatsView currentId={chat.id} running={chat.running} onopen={(id) => void openChat(id)}
+                           ondeleted={(id) => { if (id === chat.id) chat.newChat(); }} />
             </div>
         {:else if DEV_TOOLS && view === 'tools'}
             <div class="page"><ToolTester /></div>
