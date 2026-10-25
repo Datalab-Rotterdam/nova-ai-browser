@@ -1,7 +1,7 @@
 import { effortFor, errorResult, modelCapabilities, type PanelEvent, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { NovaAI, NovaAIError, type ChatMessage, type ModelResponse } from '@datalabrotterdam/nova-sdk';
 import { answerPermission, callTool, releaseTabs, setAgentRunning } from '../lib/bridge';
-import { latestSession, saveSession } from '../lib/sessions';
+import { latestSession, loadSession, saveSession, type StoredSession } from '../lib/sessions';
 import { saveSettings, type Settings } from '../lib/settings';
 import { NovaBrowserAgent, type ToolCall } from './agent/loop';
 
@@ -51,7 +51,7 @@ export class ChatSession {
     private lastSettings: Settings | undefined;
     private agentKey = '';
     private controller: AbortController | undefined;
-    private sessionId: string = crypto.randomUUID();
+    private sessionId = $state<string>(crypto.randomUUID());
     private createdAt = Date.now();
     /** The model conversation of a restored chat, until the first run creates an agent with it. */
     private restoredHistory: ChatMessage[] | undefined;
@@ -59,7 +59,23 @@ export class ChatSession {
     /** Reopens the most recent chat, e.g. after the panel was closed. */
     async restore(): Promise<void> {
         const session = await latestSession();
-        if (!session) return;
+        if (session) this.show(session);
+    }
+
+    /** Switches to a saved chat; not while Nova works. Returns whether it did. */
+    async open(id: string): Promise<boolean> {
+        const session = this.running ? undefined : await loadSession(id);
+        if (!session) return false;
+        this.newChat();
+        this.show(session);
+        return true;
+    }
+
+    get id(): string {
+        return this.sessionId;
+    }
+
+    private show(session: StoredSession): void {
         for (const item of session.items) {
             // Prompts and tool calls that were open when the panel closed cannot finish any more.
             if (item.kind === 'permission' && !item.answered) item.answered = 'Expired';

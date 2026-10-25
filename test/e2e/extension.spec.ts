@@ -362,3 +362,34 @@ test('a new chat closes the tabs Nova opened and gives the user\'s tabs back', a
     expect(state).toEqual({ novaOpen: false, userGroup: -1 });
     expect(page.isClosed()).toBe(false);
 });
+
+// After the group test: opening another chat ends the current one, and with it Nova's tabs.
+test('the chat list reopens and deletes saved chats', async () => {
+    const session = (id: string, title: string, reply: string, updatedAt: number) => ({
+        id, title, createdAt: 1, updatedAt, model: 'e2e-model', history: [],
+        items: [{ kind: 'user', id: 1, text: title }, { kind: 'assistant', id: 2, text: reply, thinking: '' }]
+    });
+    await panel.evaluate(async ([baseUrl, chats]) => {
+        await chrome.storage.local.set({
+            settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model' },
+            sessions: chats.map((chat) => chat.id),
+            ...Object.fromEntries(chats.map((chat) => [`session:${chat.id}`, chat]))
+        });
+    }, [`${base}/v1`, [session('newer', 'Newer chat', 'Newer reply', 2), session('older', 'Older chat', 'Older reply', 1)]] as const);
+    await panel.reload();
+    await expect(panel.getByText('Newer reply')).toBeVisible();
+
+    await panel.getByRole('button', { name: 'Chats' }).click();
+    await panel.getByRole('button', { name: /^Older chat/ }).click();
+    await expect(panel.getByText('Older reply')).toBeVisible();
+    await expect(panel.getByText('Newer reply')).toHaveCount(0);
+
+    panel.once('dialog', (dialog) => void dialog.accept());
+    await panel.getByRole('button', { name: 'Chats' }).click();
+    await panel.getByRole('button', { name: 'Delete Newer chat' }).click();
+    await expect(panel.getByRole('button', { name: /^Newer chat/ })).toHaveCount(0);
+    expect(await panel.evaluate(async () => ({ ...(await chrome.storage.local.get(['sessions', 'session:newer'])) }))).toEqual({ sessions: ['older'] });
+
+    await panel.evaluate(() => chrome.storage.local.clear());
+    await panel.reload();
+});
