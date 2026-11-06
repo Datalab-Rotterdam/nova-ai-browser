@@ -73,6 +73,35 @@
         });
     });
 
+    let windowId: number | undefined;
+    let panelOpened = $state(false);
+    void chrome.tabs.getCurrent().then((tab) => (windowId = tab?.windowId));
+
+    /** Called straight from a click: sidePanel.open needs the user gesture. */
+    function openPanel() {
+        if (windowId === undefined) return;
+        void chrome.sidePanel.open({ windowId }).then(() => (panelOpened = true)).catch(() => undefined);
+    }
+
+    const signedIn = $derived(loaded && Boolean(settings.apiKey));
+    const steps = $derived([
+        {
+            id: 'open',
+            title: 'Open the side panel',
+            done: panelOpened || signedIn,
+            text: `Press ${shortcut ? `<kbd>${shortcut}</kbd>` : 'the toolbar icon'} or use the button. Press it again to close.`
+        },
+        { id: 'signin', title: 'Sign in', done: signedIn, text: 'Enter your Nova API key in the side panel.' },
+        {
+            id: 'tab',
+            title: 'Pick a page to work on',
+            done: false,
+            text: 'Nova works in its own tab group. Press "Use this tab" in the panel to let it work on the page you are looking at.'
+        }
+    ]);
+    const currentStep = $derived(steps.findIndex((step) => !step.done));
+    const allDone = $derived(currentStep === -1 || currentStep === steps.length - 1 ? signedIn : false);
+
     const SHORTCUTS_URL = navigator.userAgent.includes('Edg/') ? 'edge://extensions/shortcuts' : 'chrome://extensions/shortcuts';
 
     function configureShortcut() {
@@ -93,14 +122,23 @@
 
 {#snippet welcomeCard()}
     {#if welcome}
-        <Card title="Welcome to Nova AI" description="Four things to know before you start.">
-            <ol class="welcome">
-                <li><strong>Open Nova</strong> with {#if shortcut}<kbd>{shortcut}</kbd>{:else}the toolbar icon{/if}. Press it again to close.</li>
-                <li><strong>Sign in</strong> with your Nova API key in the side panel.</li>
-                <li><strong>Nova works in its own tab group.</strong> Press "Use this tab" in the panel to let it work on the page you are looking at.</li>
-                <li><strong>You stay in control.</strong> Nova asks before it uses a website for the first time and before anything it cannot undo, and Stop always works. Select text on a page and right-click, or type <kbd>nova</kbd> in the address bar, to ask about it.</li>
+        <Card title="Welcome to Nova AI" description="Three steps and Nova is working for you.">
+            <ol class="flow">
+                {#each steps as step, index (step.id)}
+                    <li class="step" class:done={step.done} class:current={index === currentStep}>
+                        <span class="dot" aria-hidden="true">{#if step.done}<i class="bi bi-check-lg"></i>{:else}{index + 1}{/if}</span>
+                        <div class="body">
+                            <div class="name">{step.title}{#if step.done}<span class="sr"> (done)</span>{/if}</div>
+                            <p>{@html step.text}</p>
+                            {#if step.id === 'open' && !step.done}
+                                <Button variant="primary" onclick={openPanel}>Open Nova here</Button>
+                            {/if}
+                        </div>
+                    </li>
+                {/each}
             </ol>
-            <div><Button variant="primary" onclick={dismissWelcome}>Got it</Button></div>
+            <p class="control"><strong>You stay in control.</strong> Nova asks before it uses a website for the first time and before anything it cannot undo, and Stop always works. Select text on a page and right-click, or type <kbd>nova</kbd> in the address bar, to ask about it.</p>
+            <div><Button variant={allDone ? 'primary' : 'default'} onclick={dismissWelcome}>{allDone ? 'Got it' : 'Skip'}</Button></div>
         </Card>
     {/if}
 {/snippet}
@@ -209,11 +247,78 @@
     color: var(--color-success);
   }
 
-  .welcome {
-    display: grid;
-    gap: 8px;
-    margin: 0 0 8px;
-    padding-left: 20px;
+  .flow {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+  }
+
+  .step {
+    position: relative;
+    display: flex;
+    gap: 14px;
+    padding-bottom: 20px;
+
+    &:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      left: 13px;
+      top: 30px;
+      bottom: 2px;
+      width: 2px;
+      background: var(--color-border-primary);
+    }
+
+    .dot {
+      flex: none;
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--color-border-primary);
+      border-radius: 50%;
+      background: var(--color-background-primary);
+      color: var(--color-text-muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    &.current .dot {
+      border-color: var(--color-primary, currentColor);
+      color: var(--color-text-primary);
+    }
+
+    &.done .dot {
+      border-color: var(--color-success);
+      background: var(--color-success);
+      color: #fff;
+    }
+
+    &.done::before {
+      background: var(--color-success);
+    }
+
+    .name {
+      font-weight: 600;
+    }
+
+    p {
+      margin: 2px 0 8px;
+      color: var(--color-text-secondary);
+    }
+  }
+
+  .control {
+    margin: 0 0 12px;
+    color: var(--color-text-secondary);
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .stack {
