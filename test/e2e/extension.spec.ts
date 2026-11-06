@@ -471,3 +471,60 @@ test('the panel shows tokens and cost of a chat', async () => {
     await panel.evaluate(() => chrome.storage.local.clear());
     await panel.reload();
 });
+
+const shortcutFixture = [{ id: 's1', name: 'news', prompt: 'Summarize the headlines', startUrl: 'https://example.org', schedule: { kind: 'off', time: '09:00', weekday: 1 } }];
+
+function mockModel(target: Page, requests: Array<Record<string, unknown>>, reply: string) {
+    return target.route(`${base}/v1/**`, async (route) => {
+        if (route.request().url().endsWith('/models')) {
+            return route.fulfill({ json: { object: 'list', data: [{ id: 'e2e-model', object: 'model', created: 1, owned_by: 'e2e', name: 'E2E', capabilities: ['tools'] }] } });
+        }
+        requests.push(route.request().postDataJSON());
+        const chunk = { object: 'chat.completion.chunk', choices: [{ index: 0, delta: { content: reply }, finish_reason: 'stop' }] };
+        return route.fulfill({ headers: { 'content-type': 'text/event-stream' }, body: `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n` });
+    });
+}
+
+test('typing /name suggests a shortcut and sends its prompt', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    await mockModel(panel, requests, 'Headlines done.');
+    await panel.evaluate(([baseUrl, shortcuts]) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model' }, shortcuts }), [`${base}/v1`, shortcutFixture] as const);
+    await panel.reload();
+
+    const box = panel.getByRole('textbox', { name: 'Message Nova' });
+    await box.fill('/ne');
+    await expect(panel.getByRole('option', { name: /\/news/ })).toBeVisible();
+    await box.press('Enter');
+    await expect(box).toHaveValue('/news ');
+    await box.fill('/news for today');
+    await panel.getByRole('button', { name: 'Send' }).click();
+    await expect(panel.getByText('Headlines done.')).toBeVisible();
+    const last = (requests[0].messages as Array<{ role: string; content: unknown }>).filter((m) => m.role === 'user').pop();
+    expect(String(last?.content)).toBe('Start by opening https://example.org.\n\nSummarize the headlines\n\nfor today');
+
+    await panel.unrouteAll();
+    await panel.evaluate(() => chrome.storage.local.clear());
+    await panel.reload();
+});
+
+test('a task window runs its shortcut at once', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    await panel.evaluate(([baseUrl, shortcuts]) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model' }, shortcuts }), [`${base}/v1`, shortcutFixture] as const);
+    const task = await context.newPage();
+    await mockModel(task, requests, 'Task finished.');
+    await task.goto(`${panel.url().split('?')[0]}?task=s1`);
+    await expect(task.getByText('Task finished.')).toBeVisible();
+    expect(JSON.stringify(requests[0].messages)).toContain('Summarize the headlines');
+    await task.close();
+    await panel.evaluate(() => chrome.storage.local.clear());
+});
+
+test('scheduled shortcuts get alarms, and removing them clears the alarms', async () => {
+    const alarmNames = () => panel.evaluate(async () => (await chrome.alarms.getAll()).map((alarm) => alarm.name).filter((name) => name.startsWith('shortcut:')));
+    const scheduled = { ...shortcutFixture[0], id: 's2', name: 'daily', schedule: { kind: 'daily', time: '09:00', weekday: 1 } };
+    await panel.evaluate((shortcuts) => chrome.storage.local.set({ shortcuts }), [shortcutFixture[0], scheduled]);
+    await expect.poll(alarmNames).toEqual(['shortcut:s2']);
+    await panel.evaluate(() => chrome.storage.local.set({ shortcuts: [] }));
+    await expect.poll(alarmNames).toEqual([]);
+    await panel.evaluate(() => chrome.storage.local.clear());
+});

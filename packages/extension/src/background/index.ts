@@ -8,6 +8,7 @@ import { sessionIdOf } from '../lib/sessions';
 import { onSettingsChanged } from '../lib/settings';
 import { connectHost, disconnectHost, hostStatus, notifyHost, setToolRunner } from './native';
 import './entrypoints';
+import './schedule';
 import { blockExternalCallers, callTool } from './tools';
 
 const panels = new Set<chrome.runtime.Port>();

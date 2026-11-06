@@ -12,3 +12,4 @@ export { ChatStreamParser, type StreamSink, type StreamParserOptions } from './m
 export { parseToolArguments, repairJson } from './model/jsonRepair';
 export * from './siteRules';
 export * from './usage';
+export * from './shortcuts';

@@ -51,6 +51,8 @@ export interface Settings {
     readOnly: boolean;
     /** Per-site behavior on top of the approval mode (see protocol/src/siteRules.ts). */
     siteRules: SiteRule[];
+    /** Notify when a scheduled task is done. */
+    taskNotifications: boolean;
 }
 
 export const DEFAULT_BASE_URL = 'https://api.nova.datalabrotterdam.nl/v1';
@@ -69,6 +71,7 @@ export const DEFAULT_SETTINGS: Settings = {
     developerTools: false,
     readOnly: false,
     siteRules: [],
+    taskNotifications: true,
     acpAgents: [{ name: 'Nova AI CLI', command: 'nova-ai-cli', args: ['--acp'] }]
 };
 

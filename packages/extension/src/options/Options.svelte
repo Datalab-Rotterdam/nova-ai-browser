@@ -8,11 +8,13 @@
     import { DEFAULT_SETTINGS, loadSettings, onSettingsChanged, saveSettings, type Settings as SettingsData } from '../lib/settings';
     import { ChatSession } from '../sidepanel/chat.svelte';
     import Settings from '../sidepanel/components/Settings.svelte';
+    import Shortcuts from './Shortcuts.svelte';
 
-    type Page = 'general' | 'permissions' | 'agents' | 'advanced';
+    type Page = 'general' | 'shortcuts' | 'permissions' | 'agents' | 'advanced';
 
     const PAGES: Array<{ id: Page; label: string; icon: Icons; title: string; description: string }> = [
         { id: 'general', label: 'General', icon: 'sliders', title: 'General', description: 'The model Nova uses, how it reads pages and how you open it.' },
+        { id: 'shortcuts', label: 'Shortcuts', icon: 'lightning-charge', title: 'Shortcuts', description: 'Saved prompts you run with /name or on a schedule.' },
         { id: 'permissions', label: 'Permissions', icon: 'shield-check', title: 'Permissions', description: 'Which websites Nova may use, and when it asks.' },
         { id: 'agents', label: 'Other AI apps', icon: 'plug', title: 'Other AI apps', description: 'Let other apps use this browser through Nova.' },
         { id: 'advanced', label: 'Advanced', icon: 'gear', title: 'Advanced', description: 'Scripts, limits, the server address and developer tools.' }
@@ -133,7 +135,11 @@
         <Page title={current.title} description={current.description} fit breakpoints>
             <div class="stack">
                 {@render welcomeCard()}
+                {#if page === 'shortcuts'}
+                    <Shortcuts {settings} />
+                {:else}
                 <Settings {settings} models={chat.models} modelsError={chat.modelsError} onreloadmodels={() => chat.loadModels(settings)} {page} />
+                {/if}
                 {#if page === 'general'}
                     <Card title="Keyboard shortcut" description="Opens and closes the Nova side panel in the current window.">
                         <div class="shortcut">

@@ -36,6 +36,8 @@ export default defineManifest(({ mode }) => ({
         'tabs',
         'tabGroups',
         'contextMenus',
+        'alarms',
+        'notifications',
         'nativeMessaging'
     ],
     host_permissions: ['<all_urls>'],

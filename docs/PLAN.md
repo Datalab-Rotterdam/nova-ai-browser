@@ -29,7 +29,7 @@ Status key: `[x]` done, `[ ]` open.
 
 ## Phase D: larger features (each its own PR)
 
-- [ ] **D1 Saved prompts** (`/name`) and scheduled tasks with completion notifications.
+- [x] **D1 Saved prompts** (`/name`, with a start page) and scheduled tasks (hourly, daily, weekly) with completion notifications: Settings, Shortcuts. Scheduled runs open a small Nova window, need the browser open, and skip a run when Nova is busy.
 - [ ] **D2 Attachments**: paste or drop images and files into the composer.
 - [ ] **D3 Voice input.**
 - [x] **D4 Usage and cost** per chat (roadmap #6): `stream_options.include_usage`, tokens and cost from the model list prices under the composer. Token calibration for compaction is still open.

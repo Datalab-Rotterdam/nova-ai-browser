@@ -144,6 +144,11 @@ export class ChatSession {
         }).catch(() => undefined);
     }
 
+    /** Shows a line in the conversation. */
+    notify(text: string, tone: 'info' | 'error' = 'info'): void {
+        this.push({ kind: 'notice', id: 0, text, tone });
+    }
+
     setReadOnly(on: boolean): void {
         this.readOnlyMode = on;
     }
