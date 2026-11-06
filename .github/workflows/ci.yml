@@ -21,14 +21,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
-      - name: Fetch client-lib submodule
-        # The Nova platform's UI library lives on a private GitLab; the token is a read-only deploy token.
-        env:
-          CLIENT_LIB_TOKEN: ${{ secrets.CLIENT_LIB_TOKEN }}
-        run: |
-          git config --global url."https://oauth2:${CLIENT_LIB_TOKEN}@gitlab.projectsource.nl/".insteadOf "https://gitlab.projectsource.nl/"
-          git submodule update --init
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -56,14 +51,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
-      - name: Fetch client-lib submodule
-        # The Nova platform's UI library lives on a private GitLab; the token is a read-only deploy token.
-        env:
-          CLIENT_LIB_TOKEN: ${{ secrets.CLIENT_LIB_TOKEN }}
-        run: |
-          git config --global url."https://oauth2:${CLIENT_LIB_TOKEN}@gitlab.projectsource.nl/".insteadOf "https://gitlab.projectsource.nl/"
-          git submodule update --init
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -95,14 +85,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
-      - name: Fetch client-lib submodule
-        # The Nova platform's UI library lives on a private GitLab; the token is a read-only deploy token.
-        env:
-          CLIENT_LIB_TOKEN: ${{ secrets.CLIENT_LIB_TOKEN }}
-        run: |
-          git config --global url."https://oauth2:${CLIENT_LIB_TOKEN}@gitlab.projectsource.nl/".insteadOf "https://gitlab.projectsource.nl/"
-          git submodule update --init
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -143,16 +128,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          submodules: true
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Fetch client-lib submodule
-        # The Nova platform's UI library lives on a private GitLab; the token is a read-only deploy token.
-        env:
-          CLIENT_LIB_TOKEN: ${{ secrets.CLIENT_LIB_TOKEN }}
-        run: |
-          git config --global url."https://oauth2:${CLIENT_LIB_TOKEN}@gitlab.projectsource.nl/".insteadOf "https://gitlab.projectsource.nl/"
-          git submodule update --init
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

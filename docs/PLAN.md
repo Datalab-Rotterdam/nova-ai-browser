@@ -12,7 +12,7 @@ Status key: `[x]` done, `[ ]` open.
 - [x] **A2 Privacy policy** (`docs/PRIVACY.md`). What is read (pages the user lets Nova use), what leaves the browser (prompts, page text, screenshots to the Nova API the user configured), what is stored locally, no analytics. Needs a public URL when submitting.
 - [x] **A3 Store listing text** (`docs/STORE_LISTING.md`). Description, single purpose statement, a justification for every permission (`debugger`, `<all_urls>`, `scripting`, `tabs`, `tabGroups`, `nativeMessaging`, `sidePanel`, `storage`, `unlimitedStorage`), remote-code statement, screenshot list.
 - [x] **A4 README.** Root README: what it is, install (extension + host), dev, tests, package layout (roadmap #9).
-- [x] **A5 client-lib as a submodule.** `packages/extension/src/lib/client-lib` is a git submodule (gitlab, pinned to `main`); CI fetches it with the `CLIENT_LIB_TOKEN` secret (**to do: create that read-only GitLab deploy token and add it as a repository secret**). Typecheck ignores problems inside it (`packages/extension/typecheck.mjs`).
+- [x] **A5 client-lib as a submodule.** `packages/extension/src/lib/client-lib` is a git submodule (gitlab, pinned to `main`); CI checks it out with `submodules: true` (the repository is public, so no token is needed). Typecheck ignores problems inside it (`packages/extension/typecheck.mjs`).
 
 ## Phase B: safety
 
@@ -40,5 +40,5 @@ Status key: `[x]` done, `[ ]` open.
 
 ## Order of work
 
-A1 to A4, then B1 to B3, then C1 to C4. Phase D and A5 are scheduled after those; A5 needs a decision from the owner of client-lib.
+A1 to A4, then B1 to B3, then C1 to C4. Phase D is scheduled after those.
 Every item ships with tests where the logic is pure, and the box above is ticked in the same change.

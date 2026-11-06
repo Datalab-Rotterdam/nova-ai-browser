@@ -27,9 +27,8 @@ Load `packages/extension/dist` with Developer mode on, "Load unpacked" in `chrom
 The dev build carries a signing key so the extension id stays `lnoimoijcjpcebjepmenoepmhbdgnipo`, which the native host trusts.
 
 The settings page uses `client-lib`, the Nova platform's UI library, as a git submodule at
-`packages/extension/src/lib/client-lib` (private GitLab repository, all rights reserved by its owner). Clone with
-`git clone --recurse-submodules`, or run `git submodule update --init` afterwards; you need read access to that repository.
-CI fetches it with the `CLIENT_LIB_TOKEN` secret.
+`packages/extension/src/lib/client-lib` (public GitLab repository, licensed separately by its owner). Clone with
+`git clone --recurse-submodules`, or run `git submodule update --init` afterwards.
 
 ## Release
 
