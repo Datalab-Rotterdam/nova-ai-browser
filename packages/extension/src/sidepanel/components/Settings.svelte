@@ -63,6 +63,13 @@
         </div>
 </Card>
 
+        <Card title="Mode" description="Ask mode lets Nova read pages and answer questions, but never click, type or change anything.">
+            <div class="body">
+                <Input type="checkbox" name="read-only" label="Read-only (Ask) mode" value={settings.readOnly}
+                       onchange={(e: Event) => saveSettings({ readOnly: (e.currentTarget as HTMLInputElement).checked })} />
+            </div>
+        </Card>
+
         <Card title="Reading pages" description="How Nova looks at a page.">
 <div class="body">
             <fieldset class="choices">

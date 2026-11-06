@@ -45,6 +45,8 @@ export interface Settings {
     acpAgents: AcpAgentConfig[];
     /** Shows the tool tester in the side panel. Only offered in builds that include it (see lib/build.ts). */
     developerTools: boolean;
+    /** "Ask" mode: Nova may read pages but not change them. */
+    readOnly: boolean;
 }
 
 export const DEFAULT_BASE_URL = 'https://api.nova.datalabrotterdam.nl/v1';
@@ -61,6 +63,7 @@ export const DEFAULT_SETTINGS: Settings = {
     showCursorInScreenshots: false,
     externalAgents: true,
     developerTools: false,
+    readOnly: false,
     acpAgents: [{ name: 'Nova AI CLI', command: 'nova-ai-cli', args: ['--acp'] }]
 };
 

@@ -65,6 +65,8 @@ export class ChatSession {
     modelsError = $state<string | undefined>();
     queue = $state<QueuedMessage[]>([]);
 
+    /** Read-only ("Ask") mode, copied from the settings at every send so it applies to a running chat. */
+    private readOnlyMode = false;
     private agent: NovaBrowserAgent | undefined;
     /** Set when the user pressed Stop: queued messages then wait instead of running automatically. */
     private stoppedByUser = false;
@@ -136,6 +138,10 @@ export class ChatSession {
             history: this.agent?.history ?? this.restoredHistory ?? [],
             ...(this.todos.length ? { todos: this.todos } : {})
         }).catch(() => undefined);
+    }
+
+    setReadOnly(on: boolean): void {
+        this.readOnlyMode = on;
     }
 
     async loadModels(settings: Settings): Promise<void> {
@@ -283,6 +289,7 @@ export class ChatSession {
     async send(text: string, settings: Settings): Promise<void> {
         const prompt = text.trim();
         if (!prompt) return;
+        this.readOnlyMode = settings.readOnly;
         // A pending question is answered by whatever the user types.
         if (this.question) {
             this.answerQuestion(this.question, prompt);
@@ -363,6 +370,7 @@ export class ChatSession {
                 effort,
                 maxRounds: settings.maxRounds,
                 runTool: (call) => callTool(call.name, call.args, 'sidepanel'),
+                readOnly: () => this.readOnlyMode,
                 ask: (question, signal) => this.ask(question, signal),
                 setTodos: (todos) => {
                     this.todos = todos;

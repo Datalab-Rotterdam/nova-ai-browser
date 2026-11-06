@@ -12,7 +12,7 @@ export const COMPACTION_PROMPT =
     'Keep exact names, URLs, values and error messages. Do not add anything that is not in the transcript.\n\n' +
     '<transcript>\n{transcript}\n</transcript>';
 
-export function systemPrompt(options: { vision: boolean; textTools: boolean; tools: readonly ToolDefinition[]; now: Date }): string {
+export function systemPrompt(options: { vision: boolean; textTools: boolean; tools: readonly ToolDefinition[]; now: Date; readOnly?: boolean }): string {
     const canAsk = options.tools.some((tool) => tool.name === ASK_USER);
     const lines = [
         'You are Nova, an AI assistant that uses the user\'s Chromium browser to get tasks done.',
@@ -42,6 +42,7 @@ export function systemPrompt(options: { vision: boolean; textTools: boolean; too
             '- Ask with the ask_user tool, not in plain text, whenever you need a decision, a confirmation or the user to do something in the page; it waits for the answer. Give concrete options with a short description and mark the one you recommend.',
             '- A confirmation names exactly what will happen (e.g. "Place the order for €42.10 at example.com?"). Only go ahead when the user\'s answer agrees.'
         ] : []),
+        ...(options.readOnly ? ['', 'Read-only mode is ON: you may open pages and read them (navigate, read_page, find, get_page_text, screenshots, scrolling) but must not click, type, fill, upload or run scripts. Answer questions from what you read.'] : []),
         '',
         'When done, reply with a short summary of what you did and found. Keep chat replies brief; the user can watch the browser.',
         `Current date: ${options.now.toISOString().slice(0, 10)}.`

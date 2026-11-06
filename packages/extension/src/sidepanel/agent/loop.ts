@@ -29,6 +29,7 @@ import {
 } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { answerText, ASK_USER, ASK_USER_TOOL, parseQuestion, type Question } from './ask';
 import { COMPACTION_PROMPT, systemPrompt } from './prompt';
+import { readOnlyRefusal } from './readonly';
 import { parseTodos, TODO_WRITE, TODO_WRITE_TOOL, todosText, type TodoItem } from './todos';
 
 const KEPT_IMAGES = 2;
@@ -65,6 +66,8 @@ export interface AgentOptions {
     /** The model's context window in tokens, when it advertises one. */
     contextWindow?: number;
     runTool(call: ToolCall): Promise<ToolResult>;
+    /** True while read-only ("Ask") mode is on; checked on every call so the setting applies mid-chat. */
+    readOnly?(): boolean;
     /**
      * Shows a question from the `ask_user` tool and resolves with the answer, or undefined when
      * the user skipped it. Without it the model does not get the tool.
@@ -190,6 +193,8 @@ export class NovaBrowserAgent {
 
     /** Answers `ask_user` and `todo_write` in the panel; every other tool goes to the browser. */
     private async runCall(call: ToolCall, signal: AbortSignal): Promise<ToolResult> {
+        const refusal = this.options.readOnly?.() ? readOnlyRefusal(call.name, call.args) : undefined;
+        if (refusal) return errorResult(refusal);
         if (call.name === TODO_WRITE && this.options.setTodos) {
             try {
                 const todos = parseTodos(call.args);
@@ -294,7 +299,7 @@ export class NovaBrowserAgent {
     }
 
     private systemPrompt(): string {
-        return systemPrompt({ vision: this.options.vision, textTools: this.textTools, tools: this.tools, now: new Date() });
+        return systemPrompt({ vision: this.options.vision, textTools: this.textTools, tools: this.tools, now: new Date(), readOnly: this.options.readOnly?.() ?? false });
     }
 
     private keptImages(): number {

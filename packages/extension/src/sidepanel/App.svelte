@@ -50,6 +50,7 @@
         const reload = next.apiKey !== settings.apiKey || next.baseUrl !== settings.baseUrl;
         const signedOut = settings.apiKey && !next.apiKey;
         settings = next;
+        chat.setReadOnly(next.readOnly);
         if (!next.developerTools && view === 'tools') view = 'chat';
         if (signedOut) {
             chat.newChat();
