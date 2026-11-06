@@ -124,6 +124,7 @@
                     <ThemeToggler />
                 </div>
             {/if}
+            <SidebarItem icon="shield-lock" text="Privacy policy" href="https://datalabrotterdam.com/privacy-policy" target="_blank" rel="noopener" />
             <SidebarItem icon="box-arrow-right" text="Sign out" onclick={signOut} />
         {/snippet}
     </Sidebar>

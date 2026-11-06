@@ -1,7 +1,8 @@
 # Privacy policy: Nova AI browser extension
 
-Last updated 2026-11-06. Publisher: DataLab Rotterdam. This is the policy to link from the Chrome Web Store
-and Edge Add-ons listings; it needs a public URL (for example a page on datalabrotterdam.nl) before submitting.
+Last updated 2026-11-06. Publisher: DataLab Rotterdam. The company's published privacy policy, the one to link from the
+Chrome Web Store and Edge Add-ons listings, is https://datalabrotterdam.com/privacy-policy. This page describes what
+the extension itself does; keep the two consistent (the published policy should cover the extension).
 
 ## What Nova AI does
 

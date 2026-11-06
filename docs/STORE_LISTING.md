@@ -54,7 +54,7 @@ through the debugger; the user turns it on knowingly.
 - Collected: web history and website content (pages the user lets Nova read), authentication information (API key, stored locally).
 - Used only to provide the single purpose; not sold; not used for unrelated purposes or creditworthiness.
 - Sent only to the Nova AI API the user configured.
-- Privacy policy: [PRIVACY.md](./PRIVACY.md) (host it at a public URL).
+- Privacy policy URL: https://datalabrotterdam.com/privacy-policy (details of the extension's data handling: [PRIVACY.md](./PRIVACY.md)).
 
 ## Assets to prepare
 
