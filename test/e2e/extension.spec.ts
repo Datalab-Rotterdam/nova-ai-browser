@@ -421,3 +421,27 @@ test('the chat list reopens and deletes saved chats', async () => {
     await panel.evaluate(() => chrome.storage.local.clear());
     await panel.reload();
 });
+
+test('site rules block a site and make another read-only', async () => {
+    await page.bringToFront();
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/add-current' }));
+    const tree = text(await tool('read_page', { tabId, filter: 'interactive' }));
+    const ref = refFor(tree, /button/);
+    const rules = (behavior: string) => [{ id: 'r1', pattern: '127.0.0.1', behavior }];
+    const setRules = (siteRules: unknown[]) => panel.evaluate((rules) => chrome.storage.local.set({ settings: { siteRules: rules } }), siteRules);
+
+    await setRules(rules('read-only'));
+    const readOnly = await tool('computer', { tabId, action: 'left_click', ref });
+    expect(readOnly.isError).toBe(true);
+    expect(text(readOnly)).toContain('read-only');
+    expect(text(await tool('read_page', { tabId, filter: 'interactive' }))).toContain('button');
+
+    await setRules(rules('block'));
+    const blocked = await tool('read_page', { tabId, filter: 'interactive' });
+    expect(blocked.isError).toBe(true);
+    expect(text(blocked)).toContain('site rule');
+
+    await setRules([]);
+    expect((await tool('read_page', { tabId, filter: 'interactive' })).isError).toBeFalsy();
+    await panel.evaluate(() => chrome.storage.local.clear());
+});

@@ -3,6 +3,7 @@
  * callers. Every call is checked against the Nova tab group and per-site permissions.
  */
 import {
+    changesPage,
     errorResult,
     getToolDefinition,
     identifyClient,
@@ -13,7 +14,7 @@ import {
 } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { ensureAgentAllowed } from '../agents';
 import { takeDialogNotes } from '../cdp';
-import { ensureSiteAllowed } from '../permissions';
+import { ensureActionConfirmed, ensureSiteAllowed, siteRuleFor } from '../permissions';
 import { touch } from '../presence';
 import { forgetGeometry } from '../screenshot';
 import { createTab, describeTab, ensureGroup, focusTab, groupTabs, requireGroupTab, waitForLoad } from '../tabs';
@@ -134,6 +135,17 @@ async function run(request: ToolCallRequest): Promise<ToolResult> {
 
     if (name !== 'navigate') {
         await ensureSiteAllowed(tab.url ?? '', name, summarize(name, args), caller, client);
+        // Site rules (Settings, Permissions) apply on top of the approval mode, for every caller.
+        const rule = await siteRuleFor(tab.url ?? '');
+        if (rule && changesPage(name, args)) {
+            if (rule.behavior === 'read-only') {
+                throw new Error(`A site rule makes ${new URL(tab.url!).hostname} read-only: ${summarize(name, args)} would change the page, so it was not run. Read and report instead, and tell the user.`);
+            }
+            if (rule.behavior === 'ask-actions') {
+                await ensureActionConfirmed(tab.url ?? '', summarize(name, args), name, caller, client, true);
+                ctx.actionConfirmed = true;
+            }
+        }
     }
     if (NEEDS_FOCUS.has(name) || name === 'navigate') {
         await focusTab(tab);

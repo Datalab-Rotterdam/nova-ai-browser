@@ -32,7 +32,7 @@ export async function formInput(ctx: ToolContext, args: Record<string, unknown>)
     if (args.value === undefined) throw new Error('form_input needs `value`.');
     const resolved = await pageRequest<{ x: number; y: number; description: string }>(ctx.tabId, { type: 'page/resolve', ref: args.ref, scroll: true })
         .catch(() => undefined);
-    if (resolved && irreversibleAction(resolved.description)) {
+    if (resolved && !ctx.actionConfirmed && irreversibleAction(resolved.description)) {
         await ensureActionConfirmed(ctx.tab.url ?? '', resolved.description, 'form_input', ctx.caller, ctx.client);
     }
     if (resolved) {

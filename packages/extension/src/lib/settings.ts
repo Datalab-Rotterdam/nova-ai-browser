@@ -1,3 +1,5 @@
+import type { SiteRule } from '@datalabrotterdam/nova-ai-browser-protocol';
+
 export interface AcpAgentConfig {
     name: string;
     command: string;
@@ -47,6 +49,8 @@ export interface Settings {
     developerTools: boolean;
     /** "Ask" mode: Nova may read pages but not change them. */
     readOnly: boolean;
+    /** Per-site behavior on top of the approval mode (see protocol/src/siteRules.ts). */
+    siteRules: SiteRule[];
 }
 
 export const DEFAULT_BASE_URL = 'https://api.nova.datalabrotterdam.nl/v1';
@@ -64,6 +68,7 @@ export const DEFAULT_SETTINGS: Settings = {
     externalAgents: true,
     developerTools: false,
     readOnly: false,
+    siteRules: [],
     acpAgents: [{ name: 'Nova AI CLI', command: 'nova-ai-cli', args: ['--acp'] }]
 };
 

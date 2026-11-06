@@ -34,7 +34,7 @@ Status key: `[x]` done, `[ ]` open.
 - [ ] **D3 Voice input.**
 - [ ] **D4 Usage and cost** per chat (roadmap #6).
 - [x] **D5 Read-only "Ask" mode** (roadmap #7): Settings, General, Mode; refuses non-read calls in the loop and says so in the prompt.
-- [ ] **D6 Per-site rules** (roadmap #8).
+- [x] **D6 Per-site rules** (roadmap #8): `*.example.com` / `example.com/admin` patterns with Ask before acting, Read only or Block; Settings, Permissions; enforced in the service worker for every caller.
 - [ ] **D7 Dutch UI** (roadmap #11).
 - [ ] **D8 Edge Add-ons listing.**
 

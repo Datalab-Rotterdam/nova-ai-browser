@@ -84,7 +84,7 @@ export async function computer(ctx: ToolContext, args: Record<string, unknown>):
     if (action in CLICKS) {
         const spec = CLICKS[action];
         const where = await target(ctx, args);
-        if (irreversibleAction(where.description)) {
+        if (!ctx.actionConfirmed && irreversibleAction(where.description)) {
             await ensureActionConfirmed(ctx.tab.url ?? '', where.description, action, ctx.caller, ctx.client);
         }
         await click(tabId, where.point, {

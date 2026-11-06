@@ -1,9 +1,10 @@
 <script lang="ts">
-    import { modelCapabilities } from '@datalabrotterdam/nova-ai-browser-protocol';
+    import { modelCapabilities, parsePattern, SITE_RULE_BEHAVIORS, type SiteRule, type SiteRuleBehavior } from '@datalabrotterdam/nova-ai-browser-protocol';
     import type { ModelResponse } from '@datalabrotterdam/nova-sdk';
     import { DEFAULT_BASE_URL, PERMISSION_OPTIONS, saveSettings, type Settings } from '../../lib/settings';
     import { DEV_TOOLS } from '../../lib/build';
     import { Card, Input } from '$lib/client-lib/components';
+    import Button from '$lib/client-lib/components/actions/Button.svelte';
     import ExternalAgents from './ExternalAgents.svelte';
 
     interface Props {
@@ -29,6 +30,30 @@
         await chrome.storage.local.set({ sitePermissions: next });
         sites = next;
     }
+
+    let newPattern = $state('');
+    let newBehavior = $state<SiteRuleBehavior>('ask-actions');
+    let ruleError = $state<string | undefined>();
+
+    async function addRule() {
+        const pattern = newPattern.trim();
+        if (!parsePattern(pattern)) {
+            ruleError = 'Use a website like example.com, *.example.com or example.com/admin.';
+            return;
+        }
+        if (settings.siteRules.some((rule) => rule.pattern.toLowerCase() === pattern.toLowerCase())) {
+            ruleError = 'There is already a rule for that website. Change it in the list.';
+            return;
+        }
+        ruleError = undefined;
+        await saveSettings({ siteRules: [...settings.siteRules, { id: crypto.randomUUID(), pattern, behavior: newBehavior }] });
+        newPattern = '';
+    }
+
+    const changeRule = (rule: SiteRule, behavior: SiteRuleBehavior) =>
+        saveSettings({ siteRules: settings.siteRules.map((other) => (other.id === rule.id ? { ...other, behavior } : other)) });
+
+    const removeRule = (rule: SiteRule) => saveSettings({ siteRules: settings.siteRules.filter((other) => other.id !== rule.id) });
 
     function label(model: ModelResponse): string {
         const caps = modelCapabilities(model);
@@ -107,6 +132,43 @@
         </div>
 </Card>
 
+        <Card title="Site rules" description="Stricter rules for specific websites. They apply on top of the setting above, even under Allow all.">
+            <div class="body">
+                {#if settings.siteRules.length === 0}
+                    <p class="empty">No rules yet. For example, make your bank read-only, or ask before every action on your work admin site.</p>
+                {:else}
+                    <ul class="rules">
+                        {#each settings.siteRules as rule (rule.id)}
+                            <li>
+                                <span class="origin" title={rule.pattern}>{rule.pattern}</span>
+                                <select class="nova-input behavior" aria-label={`Rule for ${rule.pattern}`} value={rule.behavior}
+                                        onchange={(e) => changeRule(rule, e.currentTarget.value as SiteRuleBehavior)}>
+                                    {#each SITE_RULE_BEHAVIORS as option (option.value)}
+                                        <option value={option.value} title={option.hint}>{option.label}</option>
+                                    {/each}
+                                </select>
+                                <button class="nova-icon-button codicon codicon-close" onclick={() => removeRule(rule)} title="Remove rule" aria-label={`Remove the rule for ${rule.pattern}`}></button>
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
+                <div class="add-rule">
+                    <div class="grow">
+                        <Input type="text" name="rule-pattern" label="Website" placeholder="example.com, *.example.com or example.com/admin" value={newPattern}
+                               oninput={(e: Event) => (newPattern = (e.currentTarget as HTMLInputElement).value)}
+                               onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') void addRule(); }} />
+                    </div>
+                    <div>
+                        <Input type="select" name="rule-behavior" label="Rule" value={newBehavior} options={SITE_RULE_BEHAVIORS.map((option) => ({ value: option.value, label: option.label }))}
+                               onchange={(e: Event) => (newBehavior = (e.currentTarget as HTMLSelectElement).value as SiteRuleBehavior)} />
+                    </div>
+                    <Button variant="primary" onclick={addRule}>Add rule</Button>
+                </div>
+                {#if ruleError}<p class="error"><span class="codicon codicon-error" aria-hidden="true"></span>{ruleError}</p>{/if}
+                <p class="hint">{SITE_RULE_BEHAVIORS.find((option) => option.value === newBehavior)?.hint} Rules for <code>*.example.com</code> cover the domain and its subdomains; the most specific rule wins.</p>
+            </div>
+        </Card>
+
         <Card title="Remembered websites" description="Websites you allowed or blocked for Nova.">
 <div class="body">
             {#if siteEntries.length === 0}
@@ -164,6 +226,39 @@
   .settings {
     display: grid;
     gap: 16px;
+  }
+
+  .rules {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .origin {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .behavior {
+      width: auto;
+    }
+  }
+
+  .add-rule {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .empty {

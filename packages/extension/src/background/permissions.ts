@@ -5,7 +5,7 @@
  * The user decides: allow (for this task or browser session), always allow, or deny. Prompts go
  * to the side panel when it is open, otherwise to a small popup window.
  */
-import type { AgentClient, PanelEvent, PermissionDecision, ToolCaller } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { matchSiteRule, type AgentClient, type PanelEvent, type PermissionDecision, type SiteRule, type ToolCaller } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { DEV_TOOLS } from '../lib/build';
 import { loadSettings } from '../lib/settings';
 
@@ -38,6 +38,11 @@ export function originOf(url: string): string | undefined {
     }
 }
 
+/** The user's site rule for `url`, if any. */
+export async function siteRuleFor(url: string): Promise<SiteRule | undefined> {
+    return matchSiteRule((await loadSettings()).siteRules, url);
+}
+
 export async function storedDecisions(): Promise<Record<string, StoredDecision>> {
     return ((await chrome.storage.local.get(STORE_KEY))[STORE_KEY] ?? {}) as Record<string, StoredDecision>;
 }
@@ -67,6 +72,10 @@ export async function ensureSiteAllowed(url: string, tool: string, summary: stri
     const origin = originOf(url);
     if (!origin) {
         throw new Error(`Nova cannot use ${url}: only http(s) and file pages can be controlled.`);
+    }
+
+    if ((await siteRuleFor(url))?.behavior === 'block') {
+        throw new Error(`A site rule blocks Nova on ${origin}. Do not try this site again; tell the user.`);
     }
 
     const stored = (await storedDecisions())[origin];
@@ -116,9 +125,10 @@ export async function ensureUploadAllowed(url: string, files: string[], caller: 
  * a model (or a page injecting instructions) must never pay, send or delete without the user seeing it.
  * An agent whose user already approved this call (`preApproved`) is not asked twice.
  */
-export async function ensureActionConfirmed(url: string, element: string, tool: string, caller: ToolCaller, client?: AgentClient): Promise<void> {
+export async function ensureActionConfirmed(url: string, element: string, tool: string, caller: ToolCaller, client?: AgentClient, force = false): Promise<void> {
     const origin = originOf(url) ?? url;
-    if (client?.preApproved || (DEV_TOOLS && caller === 'debug')) return;
+    // `force`: a site rule asks every time, even when the agent's own user already approved the call.
+    if ((client?.preApproved && !force) || (DEV_TOOLS && caller === 'debug')) return;
     const decision = await requestDecision(`action:${crypto.randomUUID()}`, {
         kind: 'action',
         origin,
