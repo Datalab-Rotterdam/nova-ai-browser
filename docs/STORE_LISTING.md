@@ -16,6 +16,7 @@ gather information from several pages, and watch it do it with a visible cursor.
 - It works in its own "Nova" tab group, so your own tabs are left alone unless you hand one over.
 - It asks before it uses a website for the first time, and before actions that cannot be undone.
 - You can stop it at any time, and closing the side panel ends the run.
+- Save prompts as /shortcuts and run them on a schedule.
 - Select text and right-click, or type `nova` in the address bar, to ask about it.
 - Open or close it from anywhere with Ctrl+E (Cmd+E on Mac).
 - Optional: let Nova AI for VS Code, nova-ai-cli, Claude Code and other agents use the same browser
@@ -39,6 +40,8 @@ Let an AI model, chosen and authorised by the user, operate the user's browser o
 | `tabs` | Opens, lists and closes Nova's tabs and reads the title and address of tabs it uses. |
 | `tabGroups` | Puts Nova's tabs in their own "Nova" group. |
 | `contextMenus` | Adds "Ask Nova about this selection / page / link" to the right-click menu. |
+| `alarms` | Runs the user's own scheduled shortcuts at the time they set. |
+| `notifications` | Says when a scheduled task is done. |
 | `nativeMessaging` | Optional link to the local helper that lets other AI apps use the browser. Unused when that setting is off. |
 | Host access `<all_urls>` | Nova may be asked to work on any website. It acts only on sites the user approved, and asks first. |
 | Content scripts (`http`, `https`, `file`) | The page-reading script and the visible cursor overlay. `file://` works only if the user enables file access for the extension. |

@@ -13,6 +13,8 @@
     import ThinkingStep from './components/ThinkingStep.svelte';
     import TodoStrip from './components/TodoStrip.svelte';
     import UsageLine from './components/UsageLine.svelte';
+    import { expandShortcut, promptOf, type Shortcut } from '@datalabrotterdam/nova-ai-browser-protocol';
+    import { loadShortcuts, onShortcutsChanged } from '../lib/shortcuts';
     import ToolCard from './components/ToolCard.svelte';
     import ImageViewer from './components/ImageViewer.svelte';
     import ToolTester from './components/ToolTester.svelte';
@@ -41,11 +43,31 @@
     /** The conversation with consecutive thinking and tool steps folded into groups. */
     const entries = $derived(groupItems(chat.items));
 
+    let shortcuts = $state<Shortcut[]>([]);
+    void loadShortcuts().then((list) => (shortcuts = list));
+    const stopShortcuts = onShortcutsChanged((list) => (shortcuts = list));
+
+    /** A scheduled or manual task window opens this page with ?task=<shortcut id> and runs it at once. */
+    const taskId = new URLSearchParams(location.search).get('task');
+
+    async function runTask(id: string) {
+        const shortcut = (await loadShortcuts()).find((candidate) => candidate.id === id);
+        if (!shortcut) {
+            chat.notify('This shortcut no longer exists.', 'error');
+            return;
+        }
+        await chat.send(promptOf(shortcut), settings);
+        const answer = [...chat.items].reverse().find((item) => item.kind === 'assistant');
+        await chrome.runtime.sendMessage({ type: 'task/done', name: shortcut.name, summary: answer?.kind === 'assistant' ? answer.text.trim() : '' }).catch(() => undefined);
+    }
+
     void loadSettings().then(async (value) => {
         settings = value;
-        await chat.restore().catch(() => undefined);
+        // A task starts a fresh chat; the panel otherwise reopens the last one.
+        if (!taskId) await chat.restore().catch(() => undefined);
         loaded = true;
         await chat.loadModels(value);
+        if (taskId && value.apiKey) await runTask(taskId);
     });
     const stopSettings = onSettingsChanged((next) => {
         const reload = next.apiKey !== settings.apiKey || next.baseUrl !== settings.baseUrl;
@@ -80,6 +102,7 @@
     });
     onDestroy(() => {
         stopSettings();
+        stopShortcuts();
         stopPort();
         chrome.storage.onChanged.removeListener(onPending);
     });
@@ -263,7 +286,8 @@
                     {vision}
                     approvalMode={settings.approvalMode}
                     onapprovalmode={(approvalMode) => saveSettings({ approvalMode })}
-                    onsend={(text) => chat.send(text, settings)}
+                    shortcuts={shortcuts}
+                    onsend={(text) => chat.send(expandShortcut(text, shortcuts) ?? text, settings)}
                     onstop={() => chat.stop('Stopped.')}
                     onmodel={(model) => saveSettings({ model })}
                     oneffort={(effort) => saveSettings({ effort })}
