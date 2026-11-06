@@ -230,6 +230,45 @@ function press(x: number, y: number, button: 'left' | 'right' | 'middle'): void 
     setTimeout(() => ripple.remove(), 600);
 }
 
+const highlights = new Set<HTMLDivElement>();
+
+function clearHighlights(): void {
+    for (const box of highlights) box.remove();
+    highlights.clear();
+    window.removeEventListener('scroll', clearHighlights, true);
+}
+
+/** A box around something Nova points out; gone after `ms`, or when the page scrolls and it no longer fits. */
+function highlight(message: Extract<OverlayMessage, { type: 'overlay/highlight' }>): void {
+    const overlay = ensureOverlay();
+    const pad = 4;
+    const box = document.createElement('div');
+    box.className = 'highlight';
+    box.style.left = `${message.left - pad}px`;
+    box.style.top = `${message.top - pad}px`;
+    box.style.width = `${message.width + pad * 2}px`;
+    box.style.height = `${message.height + pad * 2}px`;
+    if (message.label) {
+        const label = document.createElement('div');
+        label.className = 'highlight-label';
+        // Below the box when there is no room above it.
+        if (message.top < 32) label.classList.add('below');
+        label.textContent = message.label;
+        box.appendChild(label);
+    }
+    overlay.layer.appendChild(box);
+    highlights.add(box);
+    setTimeout(() => {
+        box.remove();
+        highlights.delete(box);
+    }, message.ms);
+    // The box is fixed to the viewport: after a scroll it would point at the wrong thing. Let the
+    // smooth scroll that brought the element into view settle first.
+    setTimeout(() => {
+        if (highlights.has(box)) window.addEventListener('scroll', clearHighlights, { capture: true, once: true, passive: true });
+    }, 300);
+}
+
 /** Resolves after the browser has painted, so a screenshot taken next does or does not include the overlay. */
 function afterPaint(): Promise<void> {
     if (document.hidden) return Promise.resolve();
@@ -268,6 +307,9 @@ async function handle(message: OverlayMessage): Promise<unknown> {
             return true;
         case 'overlay/capture-end':
             ensureOverlay().layer.classList.remove('capturing');
+            return true;
+        case 'overlay/highlight':
+            highlight(message);
             return true;
     }
 }

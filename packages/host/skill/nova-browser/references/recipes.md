@@ -35,6 +35,20 @@ nova-browser get_page_text tabId=<id>
 4. Read the page again and check every value before submitting. **Ask the user before submitting**
    anything that sends data to someone (orders, applications, messages).
 
+## Upload a file
+
+- Only upload files the user named for this task. `upload_file ref=<file input or its button> paths=["/absolute/path/cv.pdf"]`.
+- The user confirms every upload in the browser; if they deny, stop and ask them.
+- Check the page for a preview or an error before submitting.
+
+## Read a table
+
+```
+nova-browser extract_table tabId=<id> format=csv
+```
+
+Without `ref` or `index` it returns the largest table and lists the others; pass `index=<n>` for another one.
+
 ## Sign-in walls, CAPTCHAs and two-factor codes
 
 Do not type credentials or codes. Tell the user what is needed ("Please sign in to … in the Nova

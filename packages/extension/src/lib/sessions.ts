@@ -4,6 +4,7 @@
  * from ~/.nova-ai/browser/sessions. Screenshots are not saved.
  */
 import type { ChatMessage } from '@datalabrotterdam/nova-sdk';
+import type { TodoItem } from '../sidepanel/agent/todos';
 import type { ChatItem } from '../sidepanel/chat.svelte';
 
 export interface StoredSession {
@@ -16,6 +17,8 @@ export interface StoredSession {
     items: ChatItem[];
     /** What the model sees, without the system prompt. */
     history: ChatMessage[];
+    /** Nova's task list (todo_write), when it kept one. */
+    todos?: TodoItem[];
 }
 
 const INDEX_KEY = 'sessions';

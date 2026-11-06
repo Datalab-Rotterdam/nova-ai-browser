@@ -3,6 +3,7 @@ export * from './tools';
 export * from './keys';
 export * from './coords';
 export * from './messages';
+export * from './table';
 export * from './model/capabilities';
 export * from './model/errors';
 export * from './model/context';

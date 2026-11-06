@@ -59,6 +59,10 @@ the Nova AI extension (and, if it keeps failing, to run
    lists are not visible in screenshots.
 4. **Check the result** after anything that changes the page (submit, navigation, opening a menu):
    read the page again or take a screenshot. Refs can change after navigation; get fresh ones.
+   When the page needs time (search results, a spinner, a slow submit), use `wait_for`
+   (`text=…`, `selector=…`, `gone=true` or `network_idle=true`) instead of repeated screenshots.
+   For tabular data use `extract_table` (`format=csv` or `json`); to point something out to the
+   user, use `highlight`.
 5. **Finish with a short summary** of what you did and found.
 
 See `references/recipes.md` for common tasks (forms, sign-in walls, testing a local web app,

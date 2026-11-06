@@ -2,6 +2,7 @@ import {
     errorResult,
     PANEL_PORT,
     type PanelEvent,
+    type PanelHello,
     type PermissionDecision,
     type ToolCaller,
     type ToolResult
@@ -42,7 +43,18 @@ export function connectPanel(onEvent: (event: PanelEvent) => void): () => void {
 
     const connect = () => {
         port = chrome.runtime.connect({ name: PANEL_PORT });
-        port.onMessage.addListener(onEvent);
+        port.onMessage.addListener((event: PanelEvent) => {
+            if (event.type === 'panel/close') {
+                closed = true;
+                window.close();
+                return;
+            }
+            onEvent(event);
+        });
+        const hello = port;
+        void chrome.windows.getCurrent().then((win) => {
+            if (win.id !== undefined) hello.postMessage({ type: 'panel/hello', windowId: win.id } satisfies PanelHello);
+        }).catch(() => undefined);
         // The service worker can restart; reconnect so permission prompts keep arriving.
         port.onDisconnect.addListener(() => {
             if (!closed) setTimeout(connect, 250);

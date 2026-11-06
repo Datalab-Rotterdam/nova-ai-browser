@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onDestroy } from 'svelte';
+    import { Card, Input } from '$lib/client-lib/components';
     import { saveSettings, type Settings } from '../../lib/settings';
     import type { HostStatus } from '../../background/native';
     import { agentApprovals, forgetAgent, SESSION_ALLOWED, SESSION_DENIED, sessionList, storeAgentApproval, type AgentApproval } from '../../lib/agentApprovals';
@@ -30,7 +31,7 @@
     const LABELS: Record<HostStatus['state'], { icon: string; text: string }> = {
         connected: { icon: 'pass', text: 'Connected' },
         connecting: { icon: 'loading codicon-modifier-spin', text: 'Connecting…' },
-        'not-installed': { icon: 'warning', text: 'Host not installed' },
+        'not-installed': { icon: 'warning', text: 'Helper not installed' },
         disconnected: { icon: 'debug-disconnect', text: 'Not connected' },
         disabled: { icon: 'circle-slash', text: 'Off' }
     };
@@ -78,24 +79,22 @@
     const label = $derived(LABELS[status.state]);
 </script>
 
-<section>
-    <h2>External agents</h2>
-    <label class="check">
-        <input type="checkbox" checked={settings.externalAgents} onchange={(e) => saveSettings({ externalAgents: e.currentTarget.checked })} />
-        <span>Let VS Code, Claude Code and ACP agents use this browser</span>
-    </label>
+<Card title="Other AI apps" description="Let apps like Nova AI in VS Code, Claude Code or Codex drive this browser.">
+<div class="body">
+    <Input type="checkbox" name="external-agents" label="Let other AI apps use this browser" description="For example Nova AI in VS Code, Claude Code or Codex. Each app asks you once before it gets access." value={settings.externalAgents}
+               onchange={(e: Event) => saveSettings({ externalAgents: (e.currentTarget as HTMLInputElement).checked })} />
 
     {#if settings.externalAgents}
         <div class={`status ${status.state}`}>
             <span class={`codicon codicon-${label.icon}`} aria-hidden="true"></span>
             <span class="grow">{label.text}{status.version ? ` · host ${status.version}` : ''}</span>
-            <button class="nova-icon-button codicon codicon-refresh" title="Reconnect" aria-label="Reconnect to the host" onclick={reconnect}></button>
+            <button class="nova-icon-button codicon codicon-refresh" title="Reconnect" aria-label="Reconnect to the helper" onclick={reconnect}></button>
         </div>
         {#if status.error && status.state !== 'connected'}
             <p class="hint error-detail">Browser says: <code>{status.error}</code></p>
         {/if}
 
-        <div class="snippet-label">Connected agents</div>
+        <div class="snippet-label">Apps</div>
         {#if agents.length}
             <ul class="agents">
                 {#each agents as agent (agent.id)}
@@ -111,43 +110,36 @@
                 {/each}
             </ul>
         {:else}
-            <p class="hint">None yet. The first time an agent wants to use the browser, Nova asks you.</p>
+            <p class="hint">None yet. The first time an app wants to use the browser, Nova asks you.</p>
         {/if}
 
         {#if status.state === 'not-installed'}
-            <p class="hint">Install the host and the <code>nova-browser</code> skill once (needs Node.js 20+), then press reconnect. Nova AI in VS Code and the CLI then use your browser through the skill.</p>
+            <p class="hint">Apps reach the browser through a small helper program. Nova AI for VS Code and the Nova CLI install it for you; to install it yourself, run this once in a terminal (needs Node.js 20+), restart the browser and press reconnect:</p>
             <div class="snippet">
                 <code>{INSTALL}</code>
                 <button class="nova-icon-button codicon codicon-{copied === 'install' ? 'check' : 'copy'}" title="Copy" aria-label="Copy install command" onclick={() => copy('install', INSTALL)}></button>
             </div>
         {:else}
-            <p class="hint">Nova AI uses this browser through the <code>nova-browser</code> skill. Other agents can use the skill or connect over MCP:</p>
-            {#each snippets as snippet (snippet.id)}
-                <div class="snippet-label">{snippet.label}</div>
-                <div class="snippet">
-                    <code>{snippet.text}</code>
-                    <button class="nova-icon-button codicon codicon-{copied === snippet.id ? 'check' : 'copy'}" title="Copy" aria-label={`Copy ${snippet.label} config`} onclick={() => copy(snippet.id, snippet.text)}></button>
-                </div>
-            {/each}
+            <details>
+                <summary>Set up another app</summary>
+                <p class="hint">Nova AI uses this browser through the <code>nova-browser</code> skill. Other apps can use the skill or connect over MCP:</p>
+                {#each snippets as snippet (snippet.id)}
+                    <div class="snippet-label">{snippet.label}</div>
+                    <div class="snippet">
+                        <code>{snippet.text}</code>
+                        <button class="nova-icon-button codicon codicon-{copied === snippet.id ? 'check' : 'copy'}" title="Copy" aria-label={`Copy ${snippet.label} config`} onclick={() => copy(snippet.id, snippet.text)}></button>
+                    </div>
+                {/each}
+            </details>
         {/if}
     {/if}
-</section>
+</div>
+</Card>
 
 <style lang="scss">
-  section {
+  .body {
     display: grid;
-    gap: 6px;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--nova-border);
-  }
-
-  h2 {
-    margin: 0 0 2px;
-    color: var(--nova-muted);
-    font-size: 0.85em;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    gap: 8px;
   }
 
   .check {
@@ -184,7 +176,31 @@
 
   .hint,
   .snippet-label {
+    margin: 0;
     color: var(--nova-muted);
+  }
+
+  .hint {
+    font-size: 0.92em;
+  }
+
+  /* Hints under a checkbox line up with its text. */
+  .indent {
+    padding-left: 21px;
+  }
+
+  details[open] {
+    display: grid;
+    gap: 6px;
+  }
+
+  summary {
+    color: var(--nova-muted);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--nova-fg);
+    }
   }
 
   .snippet-label {

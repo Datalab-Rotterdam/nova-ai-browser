@@ -76,7 +76,7 @@ export async function ensureSiteAllowed(url: string, tool: string, summary: stri
     if (stored === 'always' || (await sessionAllowed()).includes(origin)) return;
     // The agent's user approved this call there (the agent itself was approved here first); a blocked site stays blocked.
     if (client?.preApproved) return;
-    if (!(await loadSettings()).askBeforeActing || (DEV_TOOLS && caller === 'debug')) return;
+    if ((await loadSettings()).approvalMode === 'autoAll' || (DEV_TOOLS && caller === 'debug')) return;
 
     const decision = await requestDecision(`site:${origin}`, { kind: 'site', origin, tool, summary, agent: client?.name });
     if (decision === 'deny') {
@@ -89,9 +89,54 @@ export async function ensureSiteAllowed(url: string, tool: string, summary: stri
     }
 }
 
+/**
+ * Asks before every upload, whatever the approval mode: a model (or a page injecting
+ * instructions) must never send local files to a site without the user seeing which ones.
+ * An agent whose user already approved this exact call (`preApproved`) is not asked twice.
+ */
+export async function ensureUploadAllowed(url: string, files: string[], caller: ToolCaller, client?: AgentClient): Promise<void> {
+    const origin = originOf(url) ?? url;
+    if (client?.preApproved || (DEV_TOOLS && caller === 'debug')) return;
+    const names = files.map((file) => file.split(/[\\/]/).pop() || file);
+    const decision = await requestDecision(`upload:${crypto.randomUUID()}`, {
+        kind: 'upload',
+        origin,
+        files,
+        tool: 'upload_file',
+        summary: `upload ${names.join(', ')}`,
+        agent: client?.name
+    });
+    if (decision === 'deny') {
+        throw new Error('The user did not allow this upload. Do not try again with other files; ask the user how to continue.');
+    }
+}
+
+/**
+ * Asks before a click or fill on something irreversible, whatever the approval mode, like uploads:
+ * a model (or a page injecting instructions) must never pay, send or delete without the user seeing it.
+ * An agent whose user already approved this call (`preApproved`) is not asked twice.
+ */
+export async function ensureActionConfirmed(url: string, element: string, tool: string, caller: ToolCaller, client?: AgentClient): Promise<void> {
+    const origin = originOf(url) ?? url;
+    if (client?.preApproved || (DEV_TOOLS && caller === 'debug')) return;
+    const decision = await requestDecision(`action:${crypto.randomUUID()}`, {
+        kind: 'action',
+        origin,
+        element,
+        tool,
+        summary: `${tool} ${element}`,
+        agent: client?.name
+    });
+    if (decision === 'deny') {
+        throw new Error(`The user did not allow this action (${element}). Do not try it again or another way; tell the user and ask how to continue.`);
+    }
+}
+
 type PromptDetails =
     | { kind: 'site'; origin: string; tool: string; summary: string; agent?: string }
-    | { kind: 'agent'; client: AgentClient; tool: string; summary: string };
+    | { kind: 'agent'; client: AgentClient; tool: string; summary: string }
+    | { kind: 'upload'; origin: string; files: string[]; tool: string; summary: string; agent?: string }
+    | { kind: 'action'; origin: string; element: string; tool: string; summary: string; agent?: string };
 
 /** Shows one prompt per key; concurrent requests for the same key wait for the same answer. */
 export function requestDecision(key: string, details: PromptDetails): Promise<PermissionDecision> {
@@ -111,7 +156,7 @@ export function requestDecision(key: string, details: PromptDetails): Promise<Pe
         const entry: Pending = { resolve };
         pending.set(id, entry);
 
-        const timer = setTimeout(() => answerPermission(id, 'deny'), TIMEOUT_MS);
+        const timer = setTimeout(() => answerPermission(id, 'deny', true), TIMEOUT_MS);
         const originalResolve = entry.resolve;
         entry.resolve = (decision) => {
             clearTimeout(timer);
@@ -124,9 +169,11 @@ export function requestDecision(key: string, details: PromptDetails): Promise<Pe
                 id,
                 kind: details.kind,
                 summary: details.summary,
-                ...(details.kind === 'site'
-                    ? { origin: details.origin, agent: details.agent ?? '' }
-                    : { agent: details.client.name })
+                ...(details.kind === 'agent'
+                    ? { agent: details.client.name }
+                    : { origin: details.origin, agent: details.agent ?? '' }),
+                ...(details.kind === 'upload' ? { files: details.files.join('\n') } : {}),
+                ...(details.kind === 'action' ? { element: details.element } : {})
             });
             void chrome.windows.create({
                 url: chrome.runtime.getURL(`src/permission/index.html?${params}`),
@@ -141,14 +188,21 @@ export function requestDecision(key: string, details: PromptDetails): Promise<Pe
     });
 }
 
-export function answerPermission(id: string, decision: PermissionDecision): void {
+export function answerPermission(id: string, decision: PermissionDecision, timedOut = false): void {
     const entry = pending.get(id);
     if (!entry) return;
     pending.delete(id);
     entry.resolve(decision);
-    broadcast({ type: 'permission/resolved', id });
+    broadcast({ type: 'permission/resolved', id, ...(timedOut ? { timedOut } : {}) });
     if (entry.windowId !== undefined) {
         void chrome.windows.remove(entry.windowId).catch(() => undefined);
+    }
+}
+
+/** Allows the site prompts still waiting for this task, e.g. when the user switches to "Allow all". */
+export function allowPendingSites(): void {
+    for (const id of Array.from(pending.keys())) {
+        if (id.startsWith('site:')) answerPermission(id, 'once');
     }
 }
 

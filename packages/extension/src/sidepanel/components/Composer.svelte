@@ -1,16 +1,21 @@
 <script lang="ts">
     // Same composer as nova-ai-vscode (webview/src/chat/Composer.svelte), with browser actions in the toolbar.
     import type { ModelResponse } from '@datalabrotterdam/nova-sdk';
+    import type { ApprovalMode } from '../../lib/settings';
     import type { QueuedMessage } from '../chat.svelte';
     import ModelMenu from './ModelMenu.svelte';
+    import PermissionMenu from './PermissionMenu.svelte';
 
     interface Props {
         running: boolean;
+        /** Nova waits for the answer to a question: sending answers it. */
+        asking?: boolean;
         disabled: boolean;
         models: ModelResponse[];
         modelId: string;
         effort: string;
         vision: boolean;
+        approvalMode: ApprovalMode;
         value?: string;
         queue: QueuedMessage[];
         onsend: (text: string) => void;
@@ -20,10 +25,11 @@
         onstop: () => void;
         onmodel: (modelId: string) => void;
         oneffort: (effort: string) => void;
+        onapprovalmode: (mode: ApprovalMode) => void;
         onusetab: () => void;
     }
 
-    let { running, disabled, models, modelId, effort, vision, value = $bindable(''), queue, onsend, onqueuemode, onqueueremove, onqueuesendnow, onstop, onmodel, oneffort, onusetab }: Props = $props();
+    let { running, asking = false, disabled, models, modelId, effort, vision, approvalMode, value = $bindable(''), queue, onsend, onqueuemode, onqueueremove, onqueuesendnow, onstop, onmodel, oneffort, onapprovalmode, onusetab }: Props = $props();
     let textarea: HTMLTextAreaElement | undefined = $state();
 
     // While Nova works, sending queues the message as steering (nothing is interrupted).
@@ -90,7 +96,7 @@
                 onkeydown={onKeydown}
                 rows="1"
                 disabled={disabled}
-                placeholder={disabled ? 'Connect Nova AI to start' : running ? 'Steer Nova or queue a follow-up…' : 'Ask Nova to do something in your browser…'}
+                placeholder={disabled ? 'Connect Nova AI to start' : asking ? 'Answer Nova’s question…' : running ? 'Steer Nova or queue a follow-up…' : 'Ask Nova to do something in your browser…'}
                 aria-label="Message Nova"
         ></textarea>
 
@@ -111,7 +117,7 @@
                     <span class="stop-square" aria-hidden="true"></span>
                 </button>
                 {#if canSend}
-                    <button class="send" type="submit" title="Steer Nova (Enter)" aria-label="Steer Nova">
+                    <button class="send" type="submit" title={asking ? 'Answer (Enter)' : 'Steer Nova (Enter)'} aria-label={asking ? 'Answer' : 'Steer Nova'}>
                         <span class="codicon codicon-send" aria-hidden="true"></span>
                     </button>
                 {/if}
@@ -122,6 +128,11 @@
             {/if}
         </div>
     </form>
+
+    <!-- Under the message box, like nova-ai-vscode's ModeMenu status row. -->
+    <div class="status">
+        <PermissionMenu mode={approvalMode} onmode={onapprovalmode} />
+    </div>
 </div>
 
 <style lang="scss">
@@ -286,6 +297,14 @@
 
   .spacer {
     flex: 1;
+  }
+
+  .status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    padding: 2px 4px 0;
   }
 
   .icon {

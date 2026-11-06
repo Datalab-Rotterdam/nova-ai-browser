@@ -20,7 +20,9 @@ import { createTab, describeTab, ensureGroup, focusTab, groupTabs, requireGroupT
 import { computer } from './computer';
 import type { ToolContext } from './context';
 import { javascript, readConsole, readNetwork } from './devtools';
-import { find, formInput, getPageText, readPage } from './page';
+import { extractTable, find, formInput, getPageText, highlight, readPage } from './page';
+import { uploadFile } from './upload';
+import { waitFor } from './waitFor';
 
 type TabTool = (ctx: ToolContext, args: Record<string, unknown>) => Promise<ToolResult>;
 
@@ -30,6 +32,10 @@ const TAB_TOOLS: Record<string, TabTool> = {
     find,
     form_input: formInput,
     get_page_text: getPageText,
+    wait_for: waitFor,
+    extract_table: extractTable,
+    highlight,
+    upload_file: uploadFile,
     javascript_tool: javascript,
     read_console_messages: readConsole,
     read_network_requests: readNetwork

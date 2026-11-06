@@ -8,15 +8,19 @@
     import Composer from './components/Composer.svelte';
     import Markdown from './components/Markdown.svelte';
     import PermissionCard from './components/PermissionCard.svelte';
-    import Settings from './components/Settings.svelte';
+    import QuestionCard from './components/QuestionCard.svelte';
+    import StepGroup from './components/StepGroup.svelte';
+    import ThinkingStep from './components/ThinkingStep.svelte';
+    import TodoStrip from './components/TodoStrip.svelte';
     import ToolCard from './components/ToolCard.svelte';
     import ImageViewer from './components/ImageViewer.svelte';
     import ToolTester from './components/ToolTester.svelte';
     import ChatsView from './views/ChatsView.svelte';
     import ConnectView from './views/ConnectView.svelte';
     import WelcomeView from './views/WelcomeView.svelte';
+    import { groupItems, isStepActive } from './steps';
 
-    type View = 'chat' | 'chats' | 'tools' | 'settings';
+    type View = 'chat' | 'chats' | 'tools';
 
     const chat = new ChatSession();
     let settings = $state<SettingsData>(DEFAULT_SETTINGS);
@@ -33,6 +37,8 @@
     const vision = $derived(chat.visionFor(settings));
     const modelName = $derived(chat.models.find((m) => m.id === settings.model)?.name ?? settings.model);
     const lastIsUser = $derived(chat.items[chat.items.length - 1]?.kind === 'user');
+    /** The conversation with consecutive thinking and tool steps folded into groups. */
+    const entries = $derived(groupItems(chat.items));
 
     void loadSettings().then(async (value) => {
         settings = value;
@@ -42,9 +48,29 @@
     });
     const stopSettings = onSettingsChanged((next) => {
         const reload = next.apiKey !== settings.apiKey || next.baseUrl !== settings.baseUrl;
+        const signedOut = settings.apiKey && !next.apiKey;
         settings = next;
+        if (!next.developerTools && view === 'tools') view = 'chat';
+        if (signedOut) {
+            chat.newChat();
+            view = 'chat';
+        }
         if (reload) void chat.loadModels(next);
     });
+    // A prompt from the right-click menu or the address bar: prefill the composer, never send it.
+    async function takePendingPrompt() {
+        const stored = (await chrome.storage.session.get('pendingPrompt')).pendingPrompt as { text: string; at: number } | undefined;
+        if (!stored) return;
+        await chrome.storage.session.remove('pendingPrompt');
+        if (Date.now() - stored.at > 60_000) return;
+        view = 'chat';
+        input = input ? `${input}\n${stored.text}` : stored.text;
+    }
+    void takePendingPrompt();
+    const onPending = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+        if (area === 'session' && changes.pendingPrompt?.newValue) void takePendingPrompt();
+    };
+    chrome.storage.onChanged.addListener(onPending);
     const stopPort = connectPanel((event) => {
         chat.handleEvent(event);
         // Questions for the user must be visible, whatever page of the panel is open.
@@ -53,6 +79,12 @@
     onDestroy(() => {
         stopSettings();
         stopPort();
+        chrome.storage.onChanged.removeListener(onPending);
+    });
+
+    // A question from Nova must be visible, whatever page of the panel is open.
+    $effect(() => {
+        if (chat.question) view = 'chat';
     });
 
     // Keep the newest message in view while Nova works.
@@ -61,6 +93,7 @@
         void chat.items.length;
         void (last && 'text' in last ? last.text : last);
         void chat.running;
+        void chat.question;
         void tick().then(() => scroller?.scrollTo({ top: scroller.scrollHeight }));
     });
 
@@ -69,12 +102,6 @@
         connectError = await chat.connect(apiKey, settings);
         connecting = false;
         if (!connectError) showConnect = false;
-    }
-
-    async function signOut() {
-        chat.newChat();
-        await saveSettings({ apiKey: '' });
-        view = 'chat';
     }
 
     async function useThisTab() {
@@ -117,28 +144,27 @@
 {:else}
     <section class="chat">
         <header>
+            {#if view === 'tools'}
+                <button class="nova-icon-button codicon codicon-arrow-left back" title="Back" aria-label="Back" onclick={() => (view = 'chat')}></button>
+            {/if}
             <span class="nova-mark header-mark" style:--mark-url={`url("${markUrl}")`} aria-hidden="true"></span>
-            <span class="title">{view === 'settings' ? 'Settings' : view === 'tools' ? 'Tool tester' : view === 'chats' ? 'Chats' : 'Nova'}</span>
+            <span class="title">{view === 'tools' ? 'Tool tester' : view === 'chats' ? 'Chats' : 'Nova'}</span>
             {#if view === 'chat'}
                 <button class="nova-icon-button codicon codicon-add" title="New chat" aria-label="New chat" disabled={!chat.items.length} onclick={() => chat.newChat()}></button>
             {/if}
             <button class="nova-icon-button codicon codicon-history" title="Chats" aria-label="Chats" aria-pressed={view === 'chats'} onclick={() => toggle('chats')}></button>
-            {#if DEV_TOOLS}
+            {#if DEV_TOOLS && settings.developerTools}
                 <button class="nova-icon-button codicon codicon-beaker" title="Tool tester" aria-label="Tool tester" aria-pressed={view === 'tools'} onclick={() => toggle('tools')}></button>
             {/if}
-            <button class="nova-icon-button codicon codicon-settings-gear" title="Settings" aria-label="Settings" aria-pressed={view === 'settings'} onclick={() => toggle('settings')}></button>
+            <button class="nova-icon-button codicon codicon-settings-gear" title="Settings" aria-label="Settings" onclick={() => void chrome.runtime.openOptionsPage()}></button>
         </header>
 
-        {#if view === 'settings'}
-            <div class="page">
-                <Settings {settings} models={chat.models} modelsError={chat.modelsError} onreloadmodels={() => chat.loadModels(settings)} onsignout={signOut} />
-            </div>
-        {:else if view === 'chats'}
+        {#if view === 'chats'}
             <div class="page">
                 <ChatsView currentId={chat.id} running={chat.running} onopen={(id) => void openChat(id)}
                            ondeleted={(id) => { if (id === chat.id) chat.newChat(); }} />
             </div>
-        {:else if DEV_TOOLS && view === 'tools'}
+        {:else if DEV_TOOLS && settings.developerTools && view === 'tools'}
             <div class="page"><ToolTester /></div>
         {:else}
             <div class="items" bind:this={scroller}>
@@ -157,37 +183,41 @@
                         </div>
                     {/if}
 
-                    {#each chat.items as item, index (item.id)}
-                        {#if index > 0 && chat.items[index - 1].kind === 'user' && item.kind !== 'user'}
+                    {#each entries as entry, position (entry.kind === 'group' ? entry.id : entry.item.id)}
+                        {@const at = entry.kind === 'group' ? entry.first : entry.index}
+                        {#if at > 0 && chat.items[at - 1].kind === 'user' && (entry.kind === 'group' || entry.item.kind !== 'user')}
                             <div class="reply-header">
                                 <span class="nova-mark reply-mark" style:--mark-url={`url("${markUrl}")`} aria-hidden="true"></span>
                                 <span class="reply-model">{modelName}</span>
-                                {#if chat.running && index === chat.items.length - 1}<span class="live-dot" aria-label="Working"></span>{/if}
+                                {#if chat.running && position === entries.length - 1}<span class="live-dot" aria-label="Working"></span>{/if}
                             </div>
                         {/if}
 
-                        {#if item.kind === 'user'}
-                            <div class="user" class:steered={item.steered}>
-                                {#if item.steered}<span class="steered-label"><span class="codicon codicon-arrow-small-right" aria-hidden="true"></span>Steered</span>{/if}
-                                <p>{item.text}</p>
-                            </div>
-                        {:else if item.kind === 'assistant'}
-                            {#if item.thinking}
-                                <details class="thinking">
-                                    <summary><span class="codicon codicon-lightbulb" aria-hidden="true"></span>Thinking</summary>
-                                    <p>{item.thinking}</p>
-                                </details>
-                            {/if}
-                            {#if item.text}<div class="assistant"><Markdown text={item.text} /></div>{/if}
-                        {:else if item.kind === 'tool'}
-                            <ToolCard name={item.call.name} args={item.call.args} result={item.result} />
-                        {:else if item.kind === 'permission'}
-                            <PermissionCard subject={item.subject} target={item.target} agent={item.agent} summary={item.summary} answered={item.answered}
-                                            onanswer={(decision) => chat.answer(item, decision)} />
+                        {#if entry.kind === 'group'}
+                            <StepGroup group={entry} running={chat.running && entry.steps.some(isStepActive)} />
                         {:else}
-                            <p class={`notice ${item.tone}`}>
-                                <span class={`codicon codicon-${item.tone === 'error' ? 'error' : 'info'}`} aria-hidden="true"></span>{item.text}
-                            </p>
+                            {@const item = entry.item}
+                            {#if item.kind === 'user'}
+                                <div class="user" class:steered={item.steered}>
+                                    {#if item.steered}<span class="steered-label"><span class="codicon codicon-arrow-small-right" aria-hidden="true"></span>Steered</span>{/if}
+                                    <p>{item.text}</p>
+                                </div>
+                            {:else if item.kind === 'assistant'}
+                                <div class="assistant"><Markdown text={item.text} /></div>
+                            {:else if item.kind === 'thinking'}
+                                <ThinkingStep text={item.text} durationMs={item.durationMs} running={chat.running} />
+                            {:else if item.kind === 'tool'}
+                                <ToolCard name={item.call.name} args={item.call.args} result={item.result} />
+                            {:else if item.kind === 'question'}
+                                <QuestionCard {item} onanswer={(answer) => chat.answerQuestion(item, answer)} />
+                            {:else if item.kind === 'permission'}
+                                <PermissionCard subject={item.subject} target={item.target} agent={item.agent} files={item.files} summary={item.summary} answered={item.answered}
+                                                onanswer={(decision) => chat.answer(item, decision)} />
+                            {:else}
+                                <p class={`notice ${item.tone}`}>
+                                    <span class={`codicon codicon-${item.tone === 'error' ? 'error' : 'info'}`} aria-hidden="true"></span>{item.text}
+                                </p>
+                            {/if}
                         {/if}
                     {/each}
 
@@ -199,12 +229,20 @@
                                 <span class="live-dot" aria-label="Working"></span>
                             </div>
                         {/if}
-                        <div class="working" aria-label="Nova is working"><span class="shimmer">Working…</span></div>
+                        {#if chat.question}
+                            <div class="working"><span class="codicon codicon-comment-discussion" aria-hidden="true"></span>Waiting for your answer…</div>
+                        {:else}
+                            <div class="working" aria-label="Nova is working"><span class="shimmer">Working…</span></div>
+                        {/if}
                     {/if}
                 </div>
             </div>
 
             {#if toast}<p class="toast" role="status">{toast}</p>{/if}
+
+            {#if chat.todos.length}
+                <TodoStrip todos={chat.todos} running={chat.running} ondismiss={() => chat.dismissTodos()} />
+            {/if}
 
             <Composer
                     bind:value={input}
@@ -213,11 +251,14 @@
                     onqueueremove={(id) => chat.removeQueued(id)}
                     onqueuesendnow={(id) => chat.sendQueuedNow(id, settings)}
                     running={chat.running}
+                    asking={Boolean(chat.question)}
                     disabled={!settings.model}
                     models={chat.models.filter((m) => !(m.capabilities ?? []).some((c) => /embedding|audio/.test(c)))}
                     modelId={settings.model}
                     effort={settings.effort}
                     {vision}
+                    approvalMode={settings.approvalMode}
+                    onapprovalmode={(approvalMode) => saveSettings({ approvalMode })}
                     onsend={(text) => chat.send(text, settings)}
                     onstop={() => chat.stop('Stopped.')}
                     onmodel={(model) => saveSettings({ model })}
@@ -348,25 +389,6 @@
     margin-bottom: 2px;
     color: var(--nova-muted);
     font-size: 0.85em;
-  }
-
-  .thinking {
-    color: var(--nova-muted);
-
-    summary {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-    }
-
-    p {
-      margin-top: 4px;
-      padding-left: 10px;
-      border-left: 2px solid var(--nova-subtle-border);
-      white-space: pre-wrap;
-      font-size: 0.92em;
-    }
   }
 
   .notice {
