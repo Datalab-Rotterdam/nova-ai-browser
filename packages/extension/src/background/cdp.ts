@@ -20,6 +20,8 @@ export interface NetworkEntry {
     type?: string;
     status?: number;
     failed?: string;
+    /** The response body finished loading. */
+    done?: boolean;
     time: number;
 }
 
@@ -198,6 +200,11 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
         case 'Network.responseReceived': {
             const entry = networkBuffers.get(tabId)?.get(p.requestId);
             if (entry) entry.status = p.response?.status;
+            break;
+        }
+        case 'Network.loadingFinished': {
+            const entry = networkBuffers.get(tabId)?.get(p.requestId);
+            if (entry) entry.done = true;
             break;
         }
         case 'Network.loadingFailed': {

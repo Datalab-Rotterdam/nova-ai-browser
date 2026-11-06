@@ -1,15 +1,18 @@
-import { PANEL_PORT, type OverlayEvent, type PanelEvent, type PanelRequest } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { PANEL_PORT, type OverlayEvent, type PanelHello, type PanelEvent, type PanelRequest } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { onDetach } from './cdp';
-import { answerPermission, clearSessionPermissions, denyAllPending, setPanelBroadcast } from './permissions';
+import { allowPendingSites, answerPermission, clearSessionPermissions, denyAllPending, setPanelBroadcast } from './permissions';
 import { forgetTab, hideAll, isExternalAgentActive, isRunActive, restoreAfterNavigation, setRunActive } from './presence';
 import { forgetGeometry } from './screenshot';
 import { addTabToGroup, isInGroup, releaseGroup } from './tabs';
 import { sessionIdOf } from '../lib/sessions';
 import { onSettingsChanged } from '../lib/settings';
 import { connectHost, disconnectHost, hostStatus, notifyHost, setToolRunner } from './native';
+import './entrypoints';
 import { blockExternalCallers, callTool } from './tools';
 
 const panels = new Set<chrome.runtime.Port>();
+/** The window each open panel lives in, from its hello message. */
+const panelWindows = new Map<chrome.runtime.Port, number>();
 /** A panel that reconnects within this time was reloaded, not closed. */
 const PANEL_RELOAD_MS = 3_000;
 const stopListeners = new Set<(reason: string) => void>();
@@ -51,6 +54,8 @@ setToolRunner((name, args, client) => callTool({ name, args, caller: 'mcp', clie
 void connectHost();
 onSettingsChanged((settings) => {
     void (settings.externalAgents ? connectHost() : disconnectHost());
+    // Switching to "Allow all" also answers the site prompts that are already open.
+    if (settings.approvalMode === 'autoAll') allowPendingSites();
 });
 
 // Saved chats are mirrored to the host, so agents can read them from disk (see lib/sessions.ts).
@@ -63,6 +68,26 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
+
+// Nova's panel is not shown next to its own settings page, whichever way the tab got there.
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (!changeInfo.url) return;
+    const enabled = !changeInfo.url.startsWith(chrome.runtime.getURL('src/options/'));
+    void chrome.sidePanel.setOptions({ tabId, enabled }).catch(() => undefined);
+});
+
+// The toggle-panel shortcut. sidePanel.open() needs the user gesture, so nothing is awaited before it.
+chrome.commands.onCommand.addListener((command, tab) => {
+    if (command !== 'toggle-panel' || !tab || tab.windowId === undefined) return;
+    const windowId = tab.windowId;
+    for (const [port, id] of panelWindows) {
+        if (id === windowId) {
+            port.postMessage({ type: 'panel/close' } satisfies PanelEvent);
+            return;
+        }
+    }
+    void chrome.sidePanel.open({ windowId }).catch(() => undefined);
+});
 
 /**
  * True for the extension's own pages (side panel, permission prompt, tool tester), whether they
@@ -80,10 +105,14 @@ chrome.runtime.onConnect.addListener((port) => {
         return;
     }
     panels.add(port);
+    port.onMessage.addListener((message: PanelHello) => {
+        if (message?.type === 'panel/hello' && typeof message.windowId === 'number') panelWindows.set(port, message.windowId);
+    });
     // Opening the panel is a good moment to pick up a host installed since the last attempt.
     void connectHost();
     port.onDisconnect.addListener(() => {
         panels.delete(port);
+        panelWindows.delete(port);
         // Closing the panel ends its run.
         if (!panels.size && isRunActive()) {
             void stopAgent('The side panel was closed.');

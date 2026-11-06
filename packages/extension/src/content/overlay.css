@@ -253,10 +253,51 @@
   background: var(--pill-border);
 }
 
+/* Something Nova points out (highlight tool). */
+.highlight {
+  position: fixed;
+  box-sizing: border-box;
+  border: 2px solid var(--primary);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 22%, transparent);
+  animation: nova-highlight-in 240ms ease-out;
+}
+
+.highlight-label {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: -2px;
+  max-width: 320px;
+  padding: 3px 8px;
+  border: 1px solid var(--pill-border);
+  border-radius: 6px;
+  background: var(--pill-bg);
+  color: var(--pill-fg);
+  font: 500 12px/1.4 var(--font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.highlight-label.below {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+
+@keyframes nova-highlight-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
 /* Screenshots: hide everything for one frame. */
 .capturing .cursor,
 .capturing .edge,
 .capturing .stop-wrap,
+.capturing .highlight,
 .capturing .ripple {
   visibility: hidden !important;
 }
@@ -278,6 +319,10 @@
   .edge {
     transition: none;
   }
+
+  .highlight {
+    animation: none;
+  }
 }
 
 /* High contrast: solid, unanimated frame instead of glows; strong borders on pills. */
@@ -295,7 +340,13 @@
     padding: 4px;
   }
 
+  .highlight {
+    border-width: 3px;
+    box-shadow: none;
+  }
+
   .label,
+  .highlight-label,
   .stop {
     border: 2px solid currentColor;
     box-shadow: none;

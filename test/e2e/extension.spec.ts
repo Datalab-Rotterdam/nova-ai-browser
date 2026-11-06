@@ -6,7 +6,7 @@
  * NOVA_E2E_CHANNEL=msedge (or chrome-beta, …) to use an installed one that allows --load-extension.
  */
 import { chromium, expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -196,6 +196,31 @@ test('scroll and scroll_to', async () => {
     await expect(page.locator('body')).toHaveAttribute('data-bottom', 'clicked');
 });
 
+test('extract_table, wait_for, highlight and upload_file', async () => {
+    const table = text(await tool('extract_table', { tabId, format: 'csv' }));
+    expect(table).toContain('"Prices"');
+    expect(table).toContain('Item,Price\nMilk,1.20\nBread,2.50\nBread,3.10');
+
+    const tree = text(await tool('read_page', { tabId }));
+    await tool('computer', { tabId, action: 'left_click', ref: refFor(tree, /button "Show later"/) });
+    const waited = await tool('wait_for', { tabId, text: 'loaded LATER', timeout: 5 });
+    expect(waited.isError, text(waited)).toBeFalsy();
+    const missing = await tool('wait_for', { tabId, text: 'Never on the page', timeout: 1 });
+    expect(missing.isError).toBe(true);
+    expect(text(missing)).toContain('Timed out after 1 s');
+    expect(text(await tool('wait_for', { tabId, selector: '#later-text', network_idle: true }))).toContain('Done waiting');
+
+    expect(text(await tool('highlight', { tabId, text: 'Loaded later', label: 'Here it is' }))).toContain('Highlighted');
+    expect((await tool('highlight', { tabId, text: 'Never on the page' })).isError).toBe(true);
+
+    const file = join(mkdtempSync(join(tmpdir(), 'nova-upload-')), 'cv.txt');
+    writeFileSync(file, 'hello');
+    const uploaded = await tool('upload_file', { tabId, ref: refFor(tree, /button "Upload CV"/), paths: [file] });
+    expect(text(uploaded)).toContain('cv.txt (5 B)');
+    await expect(page.locator('#cv-name')).toHaveText('cv.txt 5');
+    expect((await tool('upload_file', { tabId, ref: refFor(tree, /button "Upload CV"/), paths: ['cv.txt'] })).isError).toBe(true);
+});
+
 test('get_page_text and navigate', async () => {
     expect(text(await tool('get_page_text', { tabId }))).toContain('Nova fixture');
     const nav = await tool('navigate', { tabId, url: `${base}/frame.html` });
@@ -268,10 +293,13 @@ test('the model menu sets the reasoning effort sent to Nova', async () => {
 });
 
 test('full-page screenshot covers the whole page and leaves click coordinates alone', async () => {
+    // Earlier tests clear the settings, which signs out and ends the chat; hand the tab over again.
+    await page.bringToFront();
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/add-current' }));
     await page.evaluate(() => window.scrollTo(0, 0));
     const shot = await tool('computer', { tabId, action: 'screenshot', full_page: true });
     const image = shot.content.find((block) => block.type === 'image');
-    expect(image).toBeTruthy();
+    expect(image, text(shot)).toBeTruthy();
     const [, pageW, pageH] = text(shot).match(/page (\d+)x(\d+) CSS px/)!;
     const viewport = await page.evaluate(() => ({ h: window.innerHeight, scroll: document.documentElement.scrollHeight }));
     expect(Number(pageH)).toBe(viewport.scroll);
@@ -319,7 +347,7 @@ test('full-page screenshot covers the whole page and leaves click coordinates al
 });
 
 test('a screenshot in the panel opens in a zoomable viewer', async () => {
-    await panel.evaluate((baseUrl) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model' } }), `${base}/v1`);
+    await panel.evaluate((baseUrl) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model', developerTools: true } }), `${base}/v1`);
     await panel.reload();
     await panel.getByRole('button', { name: 'Tool tester' }).click();
     await panel.locator('#tool').selectOption('computer');
@@ -392,4 +420,28 @@ test('the chat list reopens and deletes saved chats', async () => {
 
     await panel.evaluate(() => chrome.storage.local.clear());
     await panel.reload();
+});
+
+test('site rules block a site and make another read-only', async () => {
+    await page.bringToFront();
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/add-current' }));
+    const tree = text(await tool('read_page', { tabId, filter: 'interactive' }));
+    const ref = refFor(tree, /button/);
+    const rules = (behavior: string) => [{ id: 'r1', pattern: '127.0.0.1', behavior }];
+    const setRules = (siteRules: unknown[]) => panel.evaluate((rules) => chrome.storage.local.set({ settings: { siteRules: rules } }), siteRules);
+
+    await setRules(rules('read-only'));
+    const readOnly = await tool('computer', { tabId, action: 'left_click', ref });
+    expect(readOnly.isError).toBe(true);
+    expect(text(readOnly)).toContain('read-only');
+    expect(text(await tool('read_page', { tabId, filter: 'interactive' }))).toContain('button');
+
+    await setRules(rules('block'));
+    const blocked = await tool('read_page', { tabId, filter: 'interactive' });
+    expect(blocked.isError).toBe(true);
+    expect(text(blocked)).toContain('site rule');
+
+    await setRules([]);
+    expect((await tool('read_page', { tabId, filter: 'interactive' })).isError).toBeFalsy();
+    await panel.evaluate(() => chrome.storage.local.clear());
 });

@@ -21,8 +21,10 @@ export default defineManifest(({ mode }) => ({
         48: 'icons/icon-48.png',
         128: 'icons/icon-128.png'
     },
+    omnibox: { keyword: 'nova' },
     action: { default_title: 'Open Nova AI' },
     background: { service_worker: 'src/background/index.ts', type: 'module' },
+    options_ui: { page: 'src/options/index.html', open_in_tab: true },
     side_panel: { default_path: 'src/sidepanel/index.html' },
     permissions: [
         'sidePanel',
@@ -33,6 +35,7 @@ export default defineManifest(({ mode }) => ({
         'debugger',
         'tabs',
         'tabGroups',
+        'contextMenus',
         'nativeMessaging'
     ],
     host_permissions: ['<all_urls>'],
@@ -49,9 +52,9 @@ export default defineManifest(({ mode }) => ({
         }
     ],
     commands: {
-        _execute_action: {
-            suggested_key: { default: 'Ctrl+Shift+Y', mac: 'Command+Shift+Y' },
-            description: 'Open Nova AI'
+        'toggle-panel': {
+            suggested_key: { default: 'Ctrl+E', mac: 'Command+E' },
+            description: 'Open or close the Nova AI side panel'
         }
     }
 }));

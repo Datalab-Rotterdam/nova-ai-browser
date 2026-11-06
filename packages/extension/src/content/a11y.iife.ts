@@ -3,7 +3,8 @@
  * element search, ref resolution to click points and form filling. Runs in the top frame and
  * walks into same-origin iframes and open shadow roots.
  */
-import type { PageRequest, PageResponse, ResolvedRef } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { formatTable, normalizeGrid } from '@datalabrotterdam/nova-ai-browser-protocol';
+import type { FileInputInfo, LocatedBox, PageRequest, PageResponse, ResolvedRef, TableGrid } from '@datalabrotterdam/nova-ai-browser-protocol';
 
 declare global {
     // eslint-disable-next-line no-var
@@ -595,6 +596,230 @@ function pageText(maxChars: number): string {
 }
 
 // ---------------------------------------------------------------------------------------------
+// wait_for, extract_table, highlight, upload_file
+
+/** Elements matching `test` in document order, through open shadow roots and same-origin iframes. */
+function deepElements(test: (element: Element) => boolean): Element[] {
+    const result: Element[] = [];
+    const stack: Array<{ element: Element; frame: Frame }> = [{ element: document.documentElement, frame: topFrame() }];
+    while (stack.length) {
+        const { element, frame } = stack.pop()!;
+        if (SKIP_TAGS.has(element.tagName) || element.id === 'nova-ai-overlay-host') continue;
+        if (test(element)) result.push(element);
+        const children = childrenOf(element, frame);
+        for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+    }
+    return result;
+}
+
+function isVisible(element: Element): boolean {
+    if (typeof element.checkVisibility === 'function' && !element.checkVisibility({ visibilityProperty: true })) return false;
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 || rect.height > 0;
+}
+
+const squash = (text: string) => text.replace(/\s+/g, ' ').trim().toLowerCase();
+
+function present(request: Extract<PageRequest, { type: 'page/present' }>): boolean {
+    if (request.ref) {
+        const element = refs.get(request.ref.trim())?.deref();
+        return Boolean(element?.isConnected && isVisible(element));
+    }
+    if (request.selector) {
+        const selector = request.selector;
+        try {
+            document.querySelector(selector);
+        } catch {
+            throw new Error(`Invalid CSS selector: ${selector}`);
+        }
+        if (Array.from(document.querySelectorAll(selector)).some(isVisible)) return true;
+        return deepElements((element) => element.matches(selector)).some(isVisible);
+    }
+    if (request.text) {
+        const needle = squash(request.text);
+        if (squash(document.body?.innerText ?? '').includes(needle)) return true;
+        // Same-origin iframes are not part of the top document's text.
+        return deepElements((element) => element.tagName === 'BODY' && element.ownerDocument !== document)
+            .some((body) => squash((body as HTMLElement).innerText).includes(needle));
+    }
+    throw new Error('Nothing to wait for.');
+}
+
+const TABLE_SELECTOR = 'table, [role="table"], [role="grid"], [role="treegrid"]';
+
+function isTable(element: Element): boolean {
+    const role = element.getAttribute('role');
+    // A <table role="presentation"> is layout, not data.
+    return role ? role === 'table' || role === 'grid' || role === 'treegrid' : element.tagName === 'TABLE';
+}
+
+function cellText(cell: Element): string {
+    return collapse((cell as HTMLElement).innerText ?? cell.textContent, 500);
+}
+
+function htmlGrid(table: HTMLTableElement): TableGrid {
+    const grid: string[][] = [];
+    Array.from(table.rows).forEach((row, r) => {
+        grid[r] ??= [];
+        let c = 0;
+        for (const cell of Array.from(row.cells)) {
+            while (grid[r][c] !== undefined) c++;
+            const text = cellText(cell);
+            // Spanned cells repeat their text, so every row reads on its own.
+            const colspan = Math.min(Math.max(cell.colSpan, 1), 50);
+            const rowspan = Math.min(Math.max(cell.rowSpan, 1), 500);
+            for (let dr = 0; dr < rowspan; dr++) {
+                for (let dc = 0; dc < colspan; dc++) (grid[r + dr] ??= [])[c + dc] = text;
+            }
+            c += colspan;
+        }
+    });
+    const first = table.rows[0];
+    const header = Boolean(first && (first.parentElement?.tagName === 'THEAD' || (first.cells.length && Array.from(first.cells).every((cell) => cell.tagName === 'TH'))));
+    return { rows: grid.map((row) => Array.from(row, (cell) => cell ?? '')), header };
+}
+
+function ariaGrid(table: Element): TableGrid {
+    const rows = Array.from(table.querySelectorAll('[role="row"]')).filter((row) => row.parentElement?.closest(TABLE_SELECTOR) === table);
+    const cellsOf = (row: Element) => Array.from(row.querySelectorAll('[role="cell"], [role="gridcell"], [role="columnheader"], [role="rowheader"]'))
+        .filter((cell) => cell.closest('[role="row"]') === row);
+    const first = rows[0] ? cellsOf(rows[0]) : [];
+    return {
+        rows: rows.map((row) => cellsOf(row).map(cellText)),
+        header: first.length > 0 && first.every((cell) => cell.getAttribute('role') === 'columnheader')
+    };
+}
+
+function gridOf(table: Element): TableGrid {
+    const grid = table instanceof HTMLTableElement && !table.getAttribute('role') ? htmlGrid(table) : ariaGrid(table);
+    return { rows: normalizeGrid(grid.rows), header: grid.header };
+}
+
+function tableName(table: Element, grid: TableGrid): string {
+    const name = (table instanceof HTMLTableElement ? collapse(table.caption?.textContent, 80) : '') || collapse(nameOf(table), 80);
+    if (name) return `"${name}"`;
+    return grid.header && grid.rows[0] ? `columns: ${collapse(grid.rows[0].join(', '), 80)}` : 'no caption';
+}
+
+function extractTable(request: Extract<PageRequest, { type: 'page/table' }>): string {
+    const all = deepElements(isTable);
+    let target: Element | undefined;
+    if (request.ref) {
+        const element = elementForRef(request.ref);
+        target = (isTable(element) ? element : element.closest(TABLE_SELECTOR) ?? element.querySelector(TABLE_SELECTOR)) ?? undefined;
+        if (!target) throw new Error(`${request.ref} (${describe(element)}) is not in or around a table.`);
+    } else if (request.index !== undefined) {
+        target = all[Math.round(request.index) - 1];
+        if (!target) throw new Error(`There is no table ${request.index}; the page has ${all.length}.`);
+    }
+    if (!target && !all.length) return 'No tables on this page. Use get_page_text or read_page instead.';
+
+    const grids = new Map<Element, TableGrid>();
+    const gridFor = (table: Element) => {
+        let grid = grids.get(table);
+        if (!grid) grids.set(table, grid = gridOf(table));
+        return grid;
+    };
+    const size = (table: Element) => gridFor(table).rows.length * (gridFor(table).rows[0]?.length ?? 0);
+    const chosen = target ?? all.reduce((best, table) => (size(table) > size(best) ? table : best));
+    const grid = gridFor(chosen);
+    if (!grid.rows.length) return 'The table is empty.';
+
+    const keep = grid.rows.slice(0, request.maxRows + (grid.header ? 1 : 0));
+    const dataRows = grid.rows.length - (grid.header ? 1 : 0);
+    const number = all.indexOf(chosen) + 1;
+    const lines = [
+        `Table${number ? ` ${number} of ${all.length}` : ''} (${tableName(chosen, grid)}): ${dataRows} rows × ${grid.rows[0].length} columns.`,
+        '',
+        formatTable({ rows: keep, header: grid.header }, request.format)
+    ];
+    if (keep.length < grid.rows.length) lines.push('', `… ${grid.rows.length - keep.length} more rows; raise max_rows to get them.`);
+    if (!target && all.length > 1) {
+        lines.push('', 'Other tables on the page (pass index):');
+        all.forEach((table, index) => {
+            if (table === chosen) return;
+            const other = gridFor(table);
+            lines.push(`${index + 1}: ${tableName(table, other)}, ${other.rows.length} rows × ${other.rows[0]?.length ?? 0} columns`);
+        });
+    }
+    return lines.join('\n');
+}
+
+/** The first visible text node range containing `text`, or the deepest element whose text contains it. */
+function findText(text: string): { range?: Range; element: Element } | undefined {
+    const needle = text.trim().toLowerCase();
+    if (!needle || !document.body) return undefined;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const parent = node.parentElement;
+        const at = (node.textContent ?? '').toLowerCase().indexOf(needle);
+        if (at < 0 || !parent || parent.closest('#nova-ai-overlay-host, script, style, noscript') || !isVisible(parent)) continue;
+        const range = document.createRange();
+        range.setStart(node, at);
+        range.setEnd(node, at + needle.length);
+        return { range, element: parent };
+    }
+    // The text spans several nodes (e.g. "Total: <b>€ 12</b>"): narrow down to the deepest element holding all of it.
+    const target = squash(text);
+    let element: Element = document.body;
+    if (!squash(document.body.innerText).includes(target)) return undefined;
+    for (;;) {
+        const child = Array.from(element.children).find((candidate) => isVisible(candidate) && squash((candidate as HTMLElement).innerText ?? '').includes(target));
+        if (!child) return { element };
+        element = child;
+    }
+}
+
+function locate(request: Extract<PageRequest, { type: 'page/locate' }>): LocatedBox {
+    let element: Element;
+    let box: () => DOMRect;
+    if (request.ref) {
+        element = elementForRef(request.ref);
+        box = () => element.getBoundingClientRect();
+    } else {
+        const found = request.text ? findText(request.text) : undefined;
+        if (!found) throw new Error(`"${request.text ?? ''}" is not on the page (only the top page and visible text are searched).`);
+        element = found.element;
+        box = () => (found.range ?? element).getBoundingClientRect();
+    }
+    element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+    const rect = box();
+    if (rect.width === 0 && rect.height === 0) throw new Error(`${describe(element)} is not visible.`);
+    const frame = frameOf(element);
+    return {
+        left: Math.round(rect.left + frame.offsetX),
+        top: Math.round(rect.top + frame.offsetY),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        description: describe(element)
+    };
+}
+
+function isFileInput(element: Element | null | undefined): element is HTMLInputElement {
+    return element instanceof HTMLInputElement && element.type === 'file';
+}
+
+function fileInput(ref: string, token: string): FileInputInfo {
+    const element = elementForRef(ref);
+    let input: HTMLInputElement | undefined;
+    if (isFileInput(element)) input = element;
+    else if (element instanceof HTMLLabelElement && isFileInput(element.control)) input = element.control;
+    else {
+        // Upload buttons usually sit next to a hidden input: look inside, then a few levels up.
+        for (let scope: Element | null = element, level = 0; scope && level < 4 && !input; scope = scope.parentElement, level++) {
+            const candidate = scope.querySelector('input[type="file"]') ?? (scope as HTMLElement).shadowRoot?.querySelector('input[type="file"]');
+            if (isFileInput(candidate)) input = candidate;
+        }
+        const all = input ? [] : deepElements(isFileInput);
+        if (!input && all.length === 1) input = all[0] as HTMLInputElement;
+    }
+    if (!input) throw new Error(`${ref} (${describe(element)}) is not a file input and none is near it. Look for it with read_page filter=all.`);
+    if (input.disabled) throw new Error(`The file input ${describe(input)} is disabled.`);
+    input.setAttribute('data-nova-upload', token);
+    return { description: describe(input), multiple: input.multiple, accept: input.accept };
+}
+
+// ---------------------------------------------------------------------------------------------
 
 function handle(request: PageRequest): unknown {
     switch (request.type) {
@@ -613,6 +838,14 @@ function handle(request: PageRequest): unknown {
             return pageText(request.maxChars);
         case 'page/describe-point':
             return describePoint(request.x, request.y);
+        case 'page/present':
+            return present(request);
+        case 'page/table':
+            return extractTable(request);
+        case 'page/locate':
+            return locate(request);
+        case 'page/file-input':
+            return fileInput(request.ref, request.token);
     }
 }
 

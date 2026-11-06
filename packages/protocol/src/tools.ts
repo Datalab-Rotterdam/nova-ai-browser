@@ -152,6 +152,70 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
         }
     },
     {
+        name: 'wait_for',
+        readOnly: true,
+        description: 'Wait until something happens in a tab instead of polling with screenshots: text or an element appears (or, with `gone`, disappears, e.g. a spinner), and/or the network goes quiet. Give at least one of text, selector, ref or network_idle.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                tabId,
+                text: { type: 'string', description: 'Text that must be on the page (case-insensitive).' },
+                selector: { type: 'string', description: 'CSS selector of an element that must be visible.' },
+                ref: { type: 'string', description: 'Element ref from read_page or find; mostly useful with `gone`.' },
+                gone: { type: 'boolean', description: 'Wait until the text, selector or ref is no longer there.' },
+                network_idle: { type: 'boolean', description: 'Also wait until no network request was started or is pending for 500 ms.' },
+                timeout: { type: 'number', description: 'Seconds to wait (default 10, max 30).' }
+            },
+            required: ['tabId']
+        }
+    },
+    {
+        name: 'extract_table',
+        readOnly: true,
+        description: 'Extract a table (HTML <table> or ARIA table/grid) as Markdown, CSV or JSON. Without ref or index it returns the largest table and lists the others.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                tabId,
+                ref: { type: 'string', description: 'Ref of the table, an element inside it, or an element that contains it.' },
+                index: { type: 'number', description: 'Number of the table on the page (1 = first), as listed by an earlier call.' },
+                format: { type: 'string', enum: ['markdown', 'csv', 'json'], description: 'Output format (default markdown). json gives one object per row keyed by the header.' },
+                max_rows: { type: 'number', description: 'Maximum rows (default 200, max 2000).' }
+            },
+            required: ['tabId']
+        }
+    },
+    {
+        name: 'highlight',
+        readOnly: true,
+        description: 'Point something out to the user: scroll an element (ref) or a piece of text into view and draw a box around it for a few seconds, with an optional label. Does not change the page.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                tabId,
+                ref: { type: 'string', description: 'Element ref from read_page or find.' },
+                text: { type: 'string', description: 'Text on the page to point at (first match, case-insensitive).' },
+                label: { type: 'string', description: 'Short note shown next to the box.' },
+                seconds: { type: 'number', description: 'How long the box stays (default 6, max 30). Scrolling the page removes it.' }
+            },
+            required: ['tabId']
+        }
+    },
+    {
+        name: 'upload_file',
+        readOnly: false,
+        description: 'Attach local files to a file input (e.g. a CV in a job form). The user is always asked to confirm the exact files first. `ref` is the <input type=file>, its label, or an element that contains it (hidden inputs are fine). Use absolute paths; never pick files the user did not ask for.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                tabId,
+                ref: { type: 'string' },
+                paths: { type: 'array', items: { type: 'string' }, description: 'Absolute file paths on this computer.' }
+            },
+            required: ['tabId', 'ref', 'paths']
+        }
+    },
+    {
         name: 'javascript_tool',
         readOnly: false,
         description: 'Run JavaScript in the page and return the result of the last expression (JSON). Disabled unless the user enabled it in settings.',
