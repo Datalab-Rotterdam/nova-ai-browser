@@ -1,4 +1,4 @@
-import { effortFor, errorResult, modelCapabilities, type PanelEvent, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { addUsage, EMPTY_USAGE, effortFor, errorResult, modelCapabilities, type PanelEvent, type ToolResult, type Usage } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { NovaAI, NovaAIError, type ChatMessage, type ModelResponse } from '@datalabrotterdam/nova-sdk';
 import { answerPermission, callTool, releaseTabs, setAgentRunning } from '../lib/bridge';
 import { latestSession, loadSession, saveSession, type StoredSession } from '../lib/sessions';
@@ -59,6 +59,8 @@ export class ChatSession {
     running = $state(false);
     /** Nova's task list (todo_write); empty when there is none or the user closed it. */
     todos = $state<TodoItem[]>([]);
+    /** Tokens and cost of this chat so far. */
+    usage = $state<Usage>(EMPTY_USAGE);
     /** The ask_user question waiting for an answer. */
     question = $state<QuestionItem | undefined>();
     models = $state<ModelResponse[]>([]);
@@ -123,6 +125,7 @@ export class ChatSession {
         this.createdAt = session.createdAt;
         this.restoredHistory = session.history;
         this.todos = session.todos ?? [];
+        this.usage = session.usage ?? EMPTY_USAGE;
     }
 
     private save(): void {
@@ -136,7 +139,8 @@ export class ChatSession {
             model: this.lastSettings?.model ?? '',
             items: this.items,
             history: this.agent?.history ?? this.restoredHistory ?? [],
-            ...(this.todos.length ? { todos: this.todos } : {})
+            ...(this.todos.length ? { todos: this.todos } : {}),
+            ...(this.usage.requests ? { usage: $state.snapshot(this.usage) } : {})
         }).catch(() => undefined);
     }
 
@@ -199,6 +203,7 @@ export class ChatSession {
         this.items = [];
         this.queue = [];
         this.todos = [];
+        this.usage = EMPTY_USAGE;
         this.agent = undefined;
         this.restoredHistory = undefined;
         this.sessionId = crypto.randomUUID();
@@ -438,7 +443,16 @@ export class ChatSession {
                     endResponse();
                     this.save();
                 },
-                notice: (text) => { this.push({ kind: 'notice', id: 0, text, tone: 'info' }); }
+                notice: (text) => { this.push({ kind: 'notice', id: 0, text, tone: 'info' }); },
+                usage: (request) => {
+                    const model = this.models.find((candidate) => candidate.id === settings.model);
+                    this.usage = addUsage(this.usage, request, model && {
+                        inputPer1m: model.input_cost_per_1m,
+                        outputPer1m: model.output_cost_per_1m,
+                        currency: model.currency
+                    });
+                    this.save();
+                }
             }, signal);
         } catch (error) {
             if (!signal.aborted) {

@@ -32,7 +32,7 @@ Status key: `[x]` done, `[ ]` open.
 - [ ] **D1 Saved prompts** (`/name`) and scheduled tasks with completion notifications.
 - [ ] **D2 Attachments**: paste or drop images and files into the composer.
 - [ ] **D3 Voice input.**
-- [ ] **D4 Usage and cost** per chat (roadmap #6).
+- [x] **D4 Usage and cost** per chat (roadmap #6): `stream_options.include_usage`, tokens and cost from the model list prices under the composer. Token calibration for compaction is still open.
 - [x] **D5 Read-only "Ask" mode** (roadmap #7): Settings, General, Mode; refuses non-read calls in the loop and says so in the prompt.
 - [x] **D6 Per-site rules** (roadmap #8): `*.example.com` / `example.com/admin` patterns with Ask before acting, Read only or Block; Settings, Permissions; enforced in the service worker for every caller.
 - [ ] **D7 Dutch UI** (roadmap #11).
