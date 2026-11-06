@@ -3,6 +3,7 @@
  * mirrors every change to the native host when it is connected, so agents can read past chats
  * from ~/.nova-ai/browser/sessions. Screenshots are not saved.
  */
+import type { Usage } from '@datalabrotterdam/nova-ai-browser-protocol';
 import type { ChatMessage } from '@datalabrotterdam/nova-sdk';
 import type { TodoItem } from '../sidepanel/agent/todos';
 import type { ChatItem } from '../sidepanel/chat.svelte';
@@ -19,6 +20,8 @@ export interface StoredSession {
     history: ChatMessage[];
     /** Nova's task list (todo_write), when it kept one. */
     todos?: TodoItem[];
+    /** Tokens and cost so far. */
+    usage?: Usage;
 }
 
 const INDEX_KEY = 'sessions';

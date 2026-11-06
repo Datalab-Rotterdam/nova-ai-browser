@@ -12,6 +12,7 @@
     import StepGroup from './components/StepGroup.svelte';
     import ThinkingStep from './components/ThinkingStep.svelte';
     import TodoStrip from './components/TodoStrip.svelte';
+    import UsageLine from './components/UsageLine.svelte';
     import ToolCard from './components/ToolCard.svelte';
     import ImageViewer from './components/ImageViewer.svelte';
     import ToolTester from './components/ToolTester.svelte';
@@ -244,6 +245,8 @@
             {#if chat.todos.length}
                 <TodoStrip todos={chat.todos} running={chat.running} ondismiss={() => chat.dismissTodos()} />
             {/if}
+
+            <UsageLine usage={chat.usage} />
 
             <Composer
                     bind:value={input}

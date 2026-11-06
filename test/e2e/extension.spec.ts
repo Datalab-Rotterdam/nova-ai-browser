@@ -445,3 +445,29 @@ test('site rules block a site and make another read-only', async () => {
     expect((await tool('read_page', { tabId, filter: 'interactive' })).isError).toBeFalsy();
     await panel.evaluate(() => chrome.storage.local.clear());
 });
+
+test('the panel shows tokens and cost of a chat', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    await panel.route(`${base}/v1/**`, async (route) => {
+        if (route.request().url().endsWith('/models')) {
+            return route.fulfill({ json: { object: 'list', data: [
+                { id: 'priced', object: 'model', created: 1, owned_by: 'e2e', name: 'Priced', capabilities: ['tools'], input_cost_per_1m: 1, output_cost_per_1m: 4, currency: 'EUR' }
+            ] } });
+        }
+        requests.push(route.request().postDataJSON());
+        const text = { object: 'chat.completion.chunk', choices: [{ index: 0, delta: { content: 'Counted.' }, finish_reason: 'stop' }] };
+        const usage = { object: 'chat.completion.chunk', choices: [], usage: { prompt_tokens: 12_400, completion_tokens: 1_200 } };
+        return route.fulfill({ headers: { 'content-type': 'text/event-stream' }, body: `data: ${JSON.stringify(text)}\n\ndata: ${JSON.stringify(usage)}\n\ndata: [DONE]\n\n` });
+    });
+    await panel.evaluate((baseUrl) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'priced' } }), `${base}/v1`);
+    await panel.reload();
+    await panel.getByRole('textbox', { name: 'Message Nova' }).fill('Hi');
+    await panel.getByRole('button', { name: 'Send' }).click();
+    await expect(panel.getByText('Counted.')).toBeVisible();
+    await expect(panel.locator('.usage')).toHaveText('12.4k in · 1.2k out · €0.02');
+    expect(requests[0]).toMatchObject({ stream_options: { include_usage: true } });
+
+    await panel.unrouteAll();
+    await panel.evaluate(() => chrome.storage.local.clear());
+    await panel.reload();
+});

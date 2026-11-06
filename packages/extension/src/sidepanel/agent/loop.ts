@@ -20,10 +20,12 @@ import {
     isContextOverflow,
     isToolCallingRejected,
     parseContextLimit,
+    readUsage,
     resultText,
     errorResult,
     textResult,
     TOOL_DEFINITIONS,
+    type RequestUsage,
     type ToolDefinition,
     type ToolResult
 } from '@datalabrotterdam/nova-ai-browser-protocol';
@@ -53,6 +55,8 @@ export interface AgentEvents {
     /** A model response finished; a new assistant bubble should start for the next one. */
     roundEnd(): void;
     notice(text: string): void;
+    /** What one model request used (tokens), when the server reports it. */
+    usage?(request: RequestUsage): void;
 }
 
 export interface AgentOptions {
@@ -333,15 +337,19 @@ export class NovaBrowserAgent {
                 model: this.options.model,
                 messages,
                 ...(this.textTools ? {} : tools.payload),
+                stream_options: { include_usage: true },
                 ...(this.options.effort ? { reasoning_effort: this.options.effort } : {})
             },
             { signal }
         );
+        let used: RequestUsage | undefined;
         for await (const event of stream) {
             if (event.type === 'chunk') {
                 parser.pushChunk(event.data);
+                used = readUsage(event.data) ?? used;
             }
         }
+        if (used) events.usage?.(used);
         parser.end();
 
         if (this.textTools) {
