@@ -199,7 +199,9 @@
     <Main>
         <Page title="Nova AI settings">
             {@render welcomeCard()}
-            <Card title="Sign in" description="Open the Nova side panel and enter your API key to get started. The settings show up here afterwards." />
+            {#if !welcome}
+                <Card title="Sign in" description="Open the Nova side panel and enter your API key to get started. The settings show up here afterwards." />
+            {/if}
         </Page>
     </Main>
 {/if}
