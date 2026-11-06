@@ -65,9 +65,12 @@
         window.removeEventListener('focus', loadShortcut);
     });
 
-    // Nova's panel is not needed next to its own settings.
-    void chrome.tabs.getCurrent().then((tab) => {
-        if (tab?.id !== undefined) void chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false }).catch(() => undefined);
+    // Nova's panel is not needed next to its own settings, except on the welcome page, where the user tries it.
+    $effect(() => {
+        const enabled = welcome;
+        void chrome.tabs.getCurrent().then((tab) => {
+            if (tab?.id !== undefined) void chrome.sidePanel.setOptions({ tabId: tab.id, enabled }).catch(() => undefined);
+        });
     });
 
     const SHORTCUTS_URL = navigator.userAgent.includes('Edg/') ? 'edge://extensions/shortcuts' : 'chrome://extensions/shortcuts';

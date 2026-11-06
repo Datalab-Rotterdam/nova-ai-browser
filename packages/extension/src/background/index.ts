@@ -70,10 +70,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
 
+/** The settings page; the welcome page (#welcome) is not one, so the panel works there. */
+function isSettingsPage(url: string | undefined): boolean {
+    return Boolean(url?.startsWith(chrome.runtime.getURL('src/options/')) && !url.includes('#welcome'));
+}
+
 // Nova's panel is not shown next to its own settings page, whichever way the tab got there.
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (!changeInfo.url) return;
-    const enabled = !changeInfo.url.startsWith(chrome.runtime.getURL('src/options/'));
+    const enabled = !isSettingsPage(changeInfo.url);
     void chrome.sidePanel.setOptions({ tabId, enabled }).catch(() => undefined);
 });
 
@@ -87,6 +92,8 @@ chrome.commands.onCommand.addListener((command, tab) => {
             return;
         }
     }
+    // On the settings page the panel is switched off for the tab; the shortcut switches it back on. Nothing is awaited: open() needs the gesture.
+    if (isSettingsPage(tab.url) && tab.id !== undefined) void chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true }).catch(() => undefined);
     void chrome.sidePanel.open({ windowId }).catch(() => undefined);
 });
 
