@@ -1,3 +1,11 @@
+# [1.4.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.3.0...v1.4.0) (2026-11-11)
+
+
+### Features
+
+* **host:** leave the nova-browser skill to nova-ai-skills ([55c84a1](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/55c84a1c335eb8e59b600443b66542fc06c425df))
+* **host:** let an app carry the host without Node ([eac9274](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/eac92741a7ae8a6b7be70d684cc4ac9e58ea9c14))
+
 # [1.3.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.2.0...v1.3.0) (2026-10-25)
 
 
