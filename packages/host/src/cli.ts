@@ -4,12 +4,12 @@
  * Browsers start it as `nova-ai-browser-host chrome-extension://<id>/` to run the host itself.
  */
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runCall } from './call';
 import { runHost } from './host';
 import { installSkill, parseSkillTargets, uninstallSkill } from './skill';
-import { install, runtimeDir, uninstall } from './install';
+import { type Carrier, install, runtimeDir, uninstall } from './install';
 import { liveHosts } from './hosts';
 import { RpcClient } from './rpc';
 import { VERSION } from './version';
@@ -20,11 +20,15 @@ const HELP = `nova-ai-browser-host ${VERSION}
                              nova-browser skill
       --auto                 startup mode for Nova apps: quiet, never downgrades a newer host
       --json                 print the result as JSON
-      --skills LIST          where to install the skill: nova (default), agents, claude,
-                             codex, all or none (comma-separated)
+      --skills LIST          also install the skill for agents outside Nova: agents, claude,
+                             codex, nova, all or none (comma-separated; default none, since
+                             Nova apps install it from @datalabrotterdam/nova-ai-skills)
       --extension-id ID      allow another extension ID (repeatable; default: dev build)
       --user-data-dir DIR    also register for a custom browser profile folder (repeatable)
+      --carrier PATH         an app that runs the host itself (no Node needed); browsers
+                             start PATH with the --carrier-arg values (repeatable) first
   uninstall                  remove the registration and installed skills
+      --carrier PATH         only when the registration runs this app
   status                     is a browser connected?
   call <tool> [key=value…]   run a browser tool (what the skill's nova-browser script does)
   config                     MCP config for VS Code and Claude Code`;
@@ -36,6 +40,14 @@ function values(args: string[], flag: string): string[] {
         else if (args[i].startsWith(`${flag}=`)) result.push(args[i].slice(flag.length + 1));
     }
     return result;
+}
+
+/** `--carrier PATH [--carrier-arg ARG]…`: an app that runs the host itself (see install.ts). */
+function carrierOption(args: string[]): Carrier | undefined {
+    const command = values(args, '--carrier')[0];
+    if (!command) return undefined;
+    if (!isAbsolute(command)) throw new Error('--carrier needs an absolute path.');
+    return { command, args: values(args, '--carrier-arg') };
 }
 
 function mcpCommand(): string {
@@ -80,8 +92,10 @@ async function main(argv: string[]): Promise<number> {
             const auto = rest.includes('--auto');
             const json = rest.includes('--json');
             const targets = parseSkillTargets(values(rest, '--skills')[0]);
-            const result = install({ extensionIds: values(rest, '--extension-id'), userDataDirs: values(rest, '--user-data-dir'), auto });
-            const skills = installSkill(targets, { root: runtimeDir(result.version), node: { path: result.node, electron: result.nodeIsElectron } });
+            const carrier = carrierOption(rest);
+            const result = install({ extensionIds: values(rest, '--extension-id'), userDataDirs: values(rest, '--user-data-dir'), auto, carrier });
+            // A carrier has the skill's files inside its own executable, not on disk: no skill yet.
+            const skills = result.carrier ? [] : installSkill(targets, { root: runtimeDir(result.version), node: { path: result.node, electron: result.nodeIsElectron } });
             const summary = { ...result, changed: result.changed || skills.length > 0, skills };
             if (json) {
                 console.log(JSON.stringify(summary));
@@ -101,8 +115,10 @@ async function main(argv: string[]): Promise<number> {
             return 0;
         }
         case 'uninstall': {
-            const browsers = uninstall({ userDataDirs: values(rest, '--user-data-dir') });
-            const skills = uninstallSkill();
+            const carrier = carrierOption(rest);
+            const browsers = uninstall({ userDataDirs: values(rest, '--user-data-dir'), carrier });
+            // The skill belongs to a Node install; an app carrying the host never installed it.
+            const skills = carrier ? [] : uninstallSkill();
             console.log(browsers.length || skills.length
                 ? [...browsers.map((b) => `Removed from ${b}.`), ...skills.map((d) => `Removed skill ${d}.`)].join('\n')
                 : 'Nothing to remove.');
