@@ -125,7 +125,8 @@ test('clicking a pay button asks the user first, and a denial stops it', async (
         ['computer', { tabId, action: 'left_click', ref }, caller] as const) as Promise<ToolResult>;
 
     const denied = click('sidepanel');
-    const card = panel.getByRole('group', { name: 'Confirm button "Pay now"' });
+    const card = panel.getByRole('group', { name: /^Confirm action on / });
+    await expect(card).toContainText('Pay now');
     await expect(card.getByRole('button', { name: 'Always allow' })).toHaveCount(0);
     await card.getByRole('button', { name: 'Deny' }).click();
     expect((await denied).isError).toBe(true);
@@ -133,12 +134,15 @@ test('clicking a pay button asks the user first, and a denial stops it', async (
     await expect(page.locator('#paid')).toHaveText('no');
 
     const allowed = click('sidepanel');
-    await panel.getByRole('group', { name: 'Confirm button "Pay now"' }).last().getByRole('button', { name: 'Allow', exact: true }).click();
+    await panel.getByRole('group', { name: /^Confirm action on / }).last().getByRole('button', { name: 'Allow', exact: true }).click();
     expect((await allowed).isError).toBeFalsy();
     await expect(page.locator('#paid')).toHaveText('yes');
 
-    await panel.evaluate(() => chrome.storage.local.clear());
-    await panel.reload();
+    // Only the settings this test set: the site permissions granted at the start stay.
+    await panel.evaluate(() => chrome.storage.local.remove('settings'));
+    // Reloading the panel starts a new chat, which gives the fixture tab back; hand it over again.
+    await page.bringToFront();
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/add-current' }));
 });
 
 test('screenshot coordinates map back to CSS pixels', async () => {
