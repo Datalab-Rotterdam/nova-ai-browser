@@ -67,7 +67,7 @@ test.beforeAll(async () => {
     // A fake HOME keeps `install` and the browser away from the user's real browser folders.
     const env = { ...process.env, HOME: root, NOVA_AI_BROWSER_HOME: home, NOVA_AI_HOME: join(root, 'nova') };
 
-    execFileSync(process.execPath, [join(HOST_DIST, 'cli.js'), 'install', '--user-data-dir', profile], { env });
+    execFileSync(process.execPath, [join(HOST_DIST, 'cli.js'), 'install', '--user-data-dir', profile, '--skills', 'nova'], { env });
 
     server = await serveFixtures(0);
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;

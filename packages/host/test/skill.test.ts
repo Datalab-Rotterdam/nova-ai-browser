@@ -121,7 +121,8 @@ describe('nova-browser skill', () => {
     });
 
     it('parses targets', () => {
-        expect(parseSkillTargets(undefined)).toEqual(['nova']);
+        // Nova apps install it from @datalabrotterdam/nova-ai-skills.
+        expect(parseSkillTargets(undefined)).toEqual([]);
         expect(parseSkillTargets('none')).toEqual([]);
         expect(parseSkillTargets('all')).toEqual(['nova', 'agents', 'claude', 'codex']);
         expect(() => parseSkillTargets('cursor')).toThrow(/Unknown skill target/);
