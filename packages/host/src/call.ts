@@ -19,7 +19,7 @@ import { RpcClient } from './rpc';
 export const NOT_CONNECTED = [
     'The Nova AI browser extension is not connected.',
     'Ask the user to open their browser (Chrome, Edge or Brave) with the Nova AI extension enabled.',
-    'If it stays disconnected, the host needs to be installed once: `npx @datalabrotterdam/nova-ai-browser-host install`.'
+    'If it stays disconnected, the host may not be set up: ask the user to turn on the Nova AI Browser plug-in in Nova AI Desktop, or to start Nova AI for VS Code or the Nova AI CLI once (with Node.js: `npx @datalabrotterdam/nova-ai-browser-host install`), then to restart the browser.'
 ].join(' ');
 
 /** Parses `key=value` pairs (values as JSON when possible) or a single JSON object. */
