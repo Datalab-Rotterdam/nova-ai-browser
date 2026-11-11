@@ -53,7 +53,7 @@ test('a Nova model uses the nova-browser skill to complete a browser task', asyn
     const profile = join(root, 'profile');
     // The harness plays nova-ai-vscode, so the skill script reports Visual Studio Code.
     const env = { ...process.env, HOME: root, NOVA_AI_BROWSER_HOME: home, NOVA_AI_HOME: novaHome, NOVA_BROWSER_CLIENT: 'Visual Studio Code' };
-    execFileSync(process.execPath, [join(HOST_DIST, 'cli.js'), 'install', '--user-data-dir', profile], { env });
+    execFileSync(process.execPath, [join(HOST_DIST, 'cli.js'), 'install', '--user-data-dir', profile, '--skills', 'nova'], { env });
 
     const server = await serveFixtures(0);
     const base = `http://127.0.0.1:${server.address().port}`;

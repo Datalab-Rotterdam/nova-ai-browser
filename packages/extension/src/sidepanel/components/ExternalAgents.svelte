@@ -19,7 +19,7 @@
     const INSTALL = 'npx @datalabrotterdam/nova-ai-browser-host install';
     const MCP = 'npx -y -p @datalabrotterdam/nova-ai-browser-host nova-ai-browser-mcp';
     const snippets = [
-        { id: 'skill', label: 'nova-browser skill for Claude Code and Codex (Nova gets it with the install)', text: `${INSTALL} --skills nova,claude,codex` },
+        { id: 'skill', label: 'nova-browser skill for Claude Code and Codex (Nova apps install it themselves)', text: `${INSTALL} --skills claude,codex` },
         { id: 'claude', label: 'Claude Code', text: `claude mcp add nova-browser -- ${MCP}` },
         {
             id: 'vscode',

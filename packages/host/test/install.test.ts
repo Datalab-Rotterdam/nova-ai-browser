@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { compareVersions, install, installedVersion, launcherScript, runtimeDir, stableNodePath } from '../src/install';
+import { carrierScript, compareVersions, install, installedVersion, launcherScript, readCarrier, runtimeDir, stableNodePath, uninstall } from '../src/install';
 import { HOST_NAME } from '../src/paths';
 import { VERSION } from '../src/version';
 
@@ -23,7 +23,12 @@ describe.skipIf(!supported)('install (startup auto mode)', () => {
         mkdirSync(edgeDir(), { recursive: true });
     });
     afterEach(() => {
-        process.env = { ...saved };
+        // Restore key by key: replacing process.env with a plain object detaches it from the real
+        // environment, and os.homedir() would keep returning the first test's (removed) home.
+        for (const key of ['HOME', 'XDG_CONFIG_HOME', 'NOVA_AI_BROWSER_HOME']) {
+            if (saved[key] === undefined) delete process.env[key];
+            else process.env[key] = saved[key];
+        }
         rmSync(home, { recursive: true, force: true });
     });
 
@@ -62,6 +67,65 @@ describe.skipIf(!supported)('install (startup auto mode)', () => {
 
         // An explicit install (not auto) uses its own version.
         expect(install({ extensionIds: [], userDataDirs: [] }).version).toBe(VERSION);
+    });
+
+    describe('with a carrier app', () => {
+        const wrapperPath = () => join(home, '.nova-ai-browser', 'bin', 'nova-ai-browser-host');
+        let carrier: { command: string; args: string[] };
+        beforeEach(() => {
+            const command = join(home, 'Nova AI.app', 'nova-sidecar');
+            mkdirSync(join(home, 'Nova AI.app'), { recursive: true });
+            writeFileSync(command, '');
+            carrier = { command, args: ['browser-host'] };
+        });
+
+        it('registers the app instead of copying the runtime', () => {
+            const result = install({ extensionIds: [], userDataDirs: [], auto: true, carrier });
+            expect(result).toMatchObject({ version: VERSION, usedThisVersion: true, changed: true, carrier, browsers: ['Microsoft Edge'] });
+            expect(existsSync(join(runtimeDir(VERSION), 'dist', 'cli.js'))).toBe(false);
+            expect(readCarrier(VERSION)).toEqual(carrier);
+            expect(installedVersion()).toBe(VERSION);
+            expect(readFileSync(wrapperPath(), 'utf8')).toContain(`exec "${carrier.command}" "browser-host" "$@"`);
+            expect(install({ extensionIds: [], userDataDirs: [], auto: true, carrier }).changed).toBe(false);
+        });
+
+        it('hands over to a Node install of the same version, and back', () => {
+            install({ extensionIds: [], userDataDirs: [], auto: true, carrier });
+            const node = install({ extensionIds: [], userDataDirs: [], auto: true });
+            expect(node.carrier).toBeUndefined();
+            expect(readFileSync(wrapperPath(), 'utf8')).toContain(join(runtimeDir(VERSION), 'dist', 'cli.js'));
+            install({ extensionIds: [], userDataDirs: [], auto: true, carrier });
+            expect(readFileSync(wrapperPath(), 'utf8')).toContain(`"${carrier.command}"`);
+        });
+
+        it('is passed over once the app is gone', () => {
+            install({ extensionIds: [], userDataDirs: [], auto: true, carrier });
+            rmSync(carrier.command);
+            expect(readCarrier(VERSION)).toBeUndefined();
+            expect(installedVersion()).toBeUndefined();
+        });
+
+        it('only removes a registration that runs the app', () => {
+            install({ extensionIds: [], userDataDirs: [], auto: true });
+            expect(uninstall({ userDataDirs: [], carrier })).toEqual([]);
+            expect(existsSync(join(edgeDir(), 'NativeMessagingHosts', `${HOST_NAME}.json`))).toBe(true);
+
+            install({ extensionIds: [], userDataDirs: [], auto: true, carrier });
+            expect(uninstall({ userDataDirs: [], carrier })).toContain('Microsoft Edge');
+            expect(existsSync(join(edgeDir(), 'NativeMessagingHosts', `${HOST_NAME}.json`))).toBe(false);
+            expect(existsSync(wrapperPath())).toBe(false);
+            // The Node runtime the other app copied stays; only the carrier's record goes.
+            expect(existsSync(join(runtimeDir(VERSION), 'dist', 'cli.js'))).toBe(true);
+            expect(readCarrier(VERSION)).toBeUndefined();
+        });
+    });
+});
+
+describe('carrierScript', () => {
+    it('runs the app with its own arguments first', () => {
+        const scripts = carrierScript({ command: 'C:\\Nova\\nova-sidecar.exe', args: ['browser-host'] }, '', 'x');
+        expect(scripts.cmd).toContain('"C:\\Nova\\nova-sidecar.exe" "browser-host" %*');
+        expect(scripts.unix).not.toContain('ELECTRON');
     });
 });
 

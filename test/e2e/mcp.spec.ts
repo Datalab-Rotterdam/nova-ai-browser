@@ -67,7 +67,7 @@ test.beforeAll(async () => {
     // A fake HOME keeps `install` and the browser away from the user's real browser folders.
     const env = { ...process.env, HOME: root, NOVA_AI_BROWSER_HOME: home, NOVA_AI_HOME: join(root, 'nova') };
 
-    execFileSync(process.execPath, [join(HOST_DIST, 'cli.js'), 'install', '--user-data-dir', profile], { env });
+    execFileSync(process.execPath, [join(HOST_DIST, 'cli.js'), 'install', '--user-data-dir', profile, '--skills', 'nova'], { env });
 
     server = await serveFixtures(0);
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
@@ -136,6 +136,19 @@ test('a new agent must be approved by the user, then each new site', async () =>
 
     const shot = await stdio.callTool({ name: 'computer', arguments: { tabId, action: 'screenshot' } }) as CallResult;
     expect(shot.content.some((block) => block.type === 'image' && (block.data?.length ?? 0) > 1000)).toBe(true);
+});
+
+test('a pay button asks the user, also for external agents', async () => {
+    const tabs = JSON.parse(text(await stdio.callTool({ name: 'tabs_context', arguments: {} }) as CallResult));
+    const tabId = tabs.tabs.find((tab: { url: string }) => tab.url.startsWith(base)).tabId;
+    const found = text(await stdio.callTool({ name: 'find', arguments: { tabId, query: 'pay now' } }) as CallResult);
+    const ref = found.match(/button "Pay now" \[(ref_\d+)\]/)?.[1];
+    expect(ref).toBeTruthy();
+
+    const click = stdio.callTool({ name: 'computer', arguments: { tabId, action: 'left_click', ref } }) as Promise<CallResult>;
+    expect(await answerPopup('Deny')).toContain('Pay now');
+    expect((await click).isError).toBe(true);
+    await expect(page.locator('#paid')).toHaveText('no');
 });
 
 test('a denied agent is refused, and not asked again', async () => {

@@ -20,6 +20,7 @@ done, what is still open, and why. Update this file as work lands.
 | **Chat list** | #9, #11 | Reopen or delete any of the 50 saved chats. |
 | **Qwen3-Coder tool calls** | #10 | `<function=…><parameter=…>` inside `<tool_call>` is parsed. |
 | **Pre-approved agents** | #12 | An agent whose user already approved a call (`NOVA_BROWSER_PREAPPROVED=1`) skips the site prompt; the agent itself still needs approval in the browser. |
+| **Confirm irreversible actions** | | Every click or `form_input` on a control labelled pay, buy, order, send, submit, delete or similar (English and Dutch, `isIrreversibleControl`) asks the user first, for every caller. Allow or deny only, each time. |
 
 ## Still to do
 
@@ -27,11 +28,6 @@ Each item ships as its own PR into `main`, with tests. Port nova-ai-vscode's cod
 already solves the problem rather than writing new code.
 
 ### Phase 1: bugs and risks
-
-#### 3. Confirm irreversible actions in code
-- **What:** "ask before purchases, sending, deleting" is only a rule in the system prompt (`agent/prompt.ts`).
-- **Why:** a model that ignores it, or a page that injects instructions, can still click "Pay".
-- **How:** before a click or `form_input` on an element whose label matches pay, buy, order, send, submit, delete or similar (from `page/resolve` / `page/describe-point`), ask the user with `requestDecision` (`packages/extension/src/background/permissions.ts`). For every caller, so MCP agents too.
 
 #### 4. Smaller loop and prompt fixes
 - A permission prompt that times out (3 minutes) silently counts as deny: tell the user in the panel.

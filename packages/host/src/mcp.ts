@@ -13,7 +13,7 @@ import { RpcClient } from './rpc';
 const NOT_CONNECTED = [
     'The Nova AI browser extension is not connected.',
     'Ask the user to open Chrome (or Edge/Brave) with the Nova AI extension enabled.',
-    'If it still fails, the native host may not be installed: `npx @datalabrotterdam/nova-ai-browser-host install`.'
+    'If it still fails, the native host may not be set up: turn on the Nova AI Browser plug-in in Nova AI Desktop, or start Nova AI for VS Code or the Nova AI CLI once (with Node.js: `npx @datalabrotterdam/nova-ai-browser-host install`), then restart the browser.'
 ].join(' ');
 
 let cached: { rpc: RpcClient; info: HostInfo } | undefined;
