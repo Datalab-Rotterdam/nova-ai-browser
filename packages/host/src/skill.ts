@@ -62,8 +62,13 @@ function readOrEmpty(file: string): string {
     }
 }
 
+/**
+ * Nova's own folder gets the skill from @datalabrotterdam/nova-ai-skills, which the Nova apps
+ * install while the browser is switched on; this installer only writes it when asked
+ * (`--skills`), for agents outside Nova.
+ */
 export function parseSkillTargets(value: string | undefined): SkillTarget[] {
-    if (!value) return ['nova'];
+    if (!value) return [];
     if (value === 'none') return [];
     if (value === 'all') return [...SKILL_TARGETS];
     const targets = value.split(',').map((part) => part.trim()).filter(Boolean);
