@@ -1,3 +1,21 @@
+# [1.6.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.5.0...v1.6.0) (2026-11-11)
+
+
+### Bug Fixes
+
+* **extension:** keep the side panel available on the welcome page ([9af4d7f](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/9af4d7f1905a0e3a5e32cf2ba20422fb6b9e8d37))
+* **extension:** no sign-in card under the welcome steps ([b88e8ae](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/b88e8ae92d8e458d8c60dd738f7f2adcc86e5d5b))
+
+
+### Features
+
+* **extension:** per-site rules ([da1ed17](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/da1ed1719d81d7b5ad14cd20ed1f479a6886c71e))
+* **extension:** read-only Ask mode ([9707e33](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/9707e33d15b6ab03dcb667556e804cdc9210c97c))
+* **extension:** saved prompts and scheduled tasks ([b5d0c2b](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/b5d0c2b9b1c6b61a6b0734812a1ace294c86070c))
+* **extension:** settings page, toggle shortcut, safety prompts and entry points ([24e2986](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/24e2986c3fc1101ba4faa05823c4caabeb3a5f99))
+* **extension:** tokens and cost per chat ([4ceff5a](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/4ceff5a6025533afa4c67ed0c169b3b8b5635b6d))
+* **extension:** welcome page as a step-by-step flow ([072a6cf](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/072a6cfdecb653c5de4d65a0fe77ab063c7ed406))
+
 # [1.5.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.4.0...v1.5.0) (2026-11-11)
 
 
