@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.4.0...v1.5.0) (2026-11-11)
+
+
+### Features
+
+* **extension:** ask the user before Nova pays, sends or deletes ([717564d](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/717564da95530e9a4147f587754946b520bd3f05))
+
 # [1.4.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.3.0...v1.4.0) (2026-11-11)
 
 
