@@ -1,5 +1,6 @@
 import { textResult, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { overlay, pageRequest } from '../content';
+import { confirmIrreversible } from '../permissions';
 import type { ToolContext } from './context';
 
 /** Page content is data from the web, never instructions; mark it so the model keeps them apart. */
@@ -31,6 +32,7 @@ export async function formInput(ctx: ToolContext, args: Record<string, unknown>)
     const resolved = await pageRequest<{ x: number; y: number; description: string }>(ctx.tabId, { type: 'page/resolve', ref: args.ref, scroll: true })
         .catch(() => undefined);
     if (resolved) {
+        await confirmIrreversible(ctx.tab.url ?? '', resolved.description, 'form_input', ctx.caller, ctx.client);
         await overlay(ctx.tabId, { type: 'overlay/move', x: resolved.x, y: resolved.y, label: `Filling ${resolved.description}`.slice(0, 48) });
     }
     return textResult(await pageRequest<string>(ctx.tabId, { type: 'page/form-input', ref: args.ref, value: args.value as string | number | boolean }));

@@ -5,7 +5,7 @@ import './permission.scss';
 
 const params = new URLSearchParams(location.search);
 const id = params.get('id') ?? '';
-const kind = params.get('kind') === 'agent' ? 'agent' : 'site';
+const kind = params.get('kind') === 'agent' ? 'agent' : params.get('kind') === 'action' ? 'action' : 'site';
 const agent = params.get('agent') || '';
 const origin = params.get('origin') ?? '';
 
@@ -18,6 +18,14 @@ if (kind === 'agent') {
     document.getElementById('summary')!.textContent = `First request: ${params.get('summary') ?? ''}`;
     document.getElementById('duration')!.textContent = '"Allow" lasts until the browser closes.';
     document.title = `${agent || 'An agent'} wants to use your browser`;
+} else if (kind === 'action') {
+    strong.textContent = params.get('summary') ?? '';
+    title.append(agent ? `${agent}: let Nova use ` : 'Let Nova use ', strong, ` on ${origin}?`);
+    document.getElementById('explain')!.textContent = 'This may pay, send or delete something and cannot always be undone. Check the page before you allow it.';
+    document.getElementById('duration')!.textContent = 'Nova asks again next time.';
+    document.querySelector('[data-decision="always"]')!.remove();
+    document.getElementById('summary')!.remove();
+    document.title = 'Confirm in Nova';
 } else {
     strong.textContent = origin;
     title.append(agent ? `${agent}: let Nova use ` : 'Let Nova use ', strong, '?');

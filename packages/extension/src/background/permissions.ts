@@ -1,11 +1,12 @@
 /**
- * Consent prompts. Two kinds:
+ * Consent prompts. Three kinds:
  * - agent: before an external agent (VS Code, Claude Code, …) may use the browser at all;
- * - site: before Nova reads or acts on a site for the first time.
- * The user decides: allow (for this task or browser session), always allow, or deny. Prompts go
- * to the side panel when it is open, otherwise to a small popup window.
+ * - site: before Nova reads or acts on a site for the first time;
+ * - action: before every click or form input on a control that pays, sends, deletes or similar.
+ * The user decides: allow (for this task or browser session), always allow, or deny; actions are
+ * allowed once or denied. Prompts go to the side panel when it is open, otherwise to a small popup window.
  */
-import type { AgentClient, PanelEvent, PermissionDecision, ToolCaller } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { isIrreversibleControl, type AgentClient, type PanelEvent, type PermissionDecision, type ToolCaller } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { DEV_TOOLS } from '../lib/build';
 import { loadSettings } from '../lib/settings';
 
@@ -89,8 +90,22 @@ export async function ensureSiteAllowed(url: string, tool: string, summary: stri
     }
 }
 
+/**
+ * Resolves when Nova may use `element` (as `page/resolve` describes it); asks the user every time
+ * the control is hard to undo. The system prompt also says to ask first, but a model can ignore
+ * that and a page can inject instructions, so this holds for every caller, external agents too.
+ */
+export async function confirmIrreversible(url: string, element: string, tool: string, caller: ToolCaller, client?: AgentClient): Promise<void> {
+    if (!isIrreversibleControl(element) || (DEV_TOOLS && caller === 'debug')) return;
+    const origin = originOf(url) ?? url;
+    const decision = await requestDecision(`action:${origin}:${element}`, { kind: 'action', origin, tool, summary: element, agent: client?.name });
+    if (decision === 'deny') {
+        throw new Error(`The user did not allow using ${element} on ${origin}. Do not try it another way; ask the user how to continue.`);
+    }
+}
+
 type PromptDetails =
-    | { kind: 'site'; origin: string; tool: string; summary: string; agent?: string }
+    | { kind: 'site' | 'action'; origin: string; tool: string; summary: string; agent?: string }
     | { kind: 'agent'; client: AgentClient; tool: string; summary: string };
 
 /** Shows one prompt per key; concurrent requests for the same key wait for the same answer. */
@@ -124,9 +139,9 @@ export function requestDecision(key: string, details: PromptDetails): Promise<Pe
                 id,
                 kind: details.kind,
                 summary: details.summary,
-                ...(details.kind === 'site'
-                    ? { origin: details.origin, agent: details.agent ?? '' }
-                    : { agent: details.client.name })
+                ...(details.kind === 'agent'
+                    ? { agent: details.client.name }
+                    : { origin: details.origin, agent: details.agent ?? '' })
             });
             void chrome.windows.create({
                 url: chrome.runtime.getURL(`src/permission/index.html?${params}`),

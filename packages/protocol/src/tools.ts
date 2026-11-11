@@ -215,3 +215,16 @@ export function isReadOnlyCall(name: string, args: Record<string, unknown>): boo
     }
     return getToolDefinition(name)?.readOnly ?? false;
 }
+
+/**
+ * Words (English and Dutch) on controls whose use is hard to undo: paying, ordering, sending,
+ * posting, deleting. Whole words only, so "Order history" asks but "Facebook" does not.
+ * ponytail: a word list misses "Continue" on a last checkout step and asks for "Sort order";
+ * per-site rules (roadmap item 8) are the place to tune it.
+ */
+const IRREVERSIBLE_WORDS = /\b(pay|payment|buy|purchase|order|checkout|check out|send|submit|post|publish|delete|transfer|book|betaal|betalen|koop|kopen|bestel|bestellen|afrekenen|verstuur|versturen|verzend|verzenden|plaats|plaatsen|verwijder|verwijderen|boek|boeken|overmaken)\b/i;
+
+/** Whether an element, as `page/resolve` or `page/describe-point` describes it (`button "Pay now"`), does something hard to undo. */
+export function isIrreversibleControl(description: string): boolean {
+    return IRREVERSIBLE_WORDS.test(description);
+}

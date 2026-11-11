@@ -1,7 +1,7 @@
 <script lang="ts">
     // Styled like a tool card awaiting approval in nova-ai-vscode.
     interface Props {
-        subject: 'site' | 'agent';
+        subject: 'site' | 'agent' | 'action';
         /** The site's origin or the agent's name. */
         target: string;
         /** External agent behind a site request, if any. */
@@ -14,11 +14,13 @@
     let { subject, target, agent, summary, answered, onanswer }: Props = $props();
 </script>
 
-<div class="tool" class:awaiting={!answered} role="group" aria-label={subject === 'agent' ? `${target} wants to use the browser` : `Permission for ${target}`}>
+<div class="tool" class:awaiting={!answered} role="group" aria-label={subject === 'agent' ? `${target} wants to use the browser` : subject === 'action' ? `Confirm ${summary}` : `Permission for ${target}`}>
     <div class="summary">
-        <span class={`codicon codicon-${answered ? 'pass' : subject === 'agent' ? 'plug' : 'shield'} status-icon`} aria-hidden="true"></span>
+        <span class={`codicon codicon-${answered ? 'pass' : subject === 'agent' ? 'plug' : subject === 'action' ? 'warning' : 'shield'} status-icon`} aria-hidden="true"></span>
         {#if subject === 'agent'}
             <span class="title"><strong>{target}</strong> wants to use your browser</span>
+        {:else if subject === 'action'}
+            <span class="title">{agent ? `${agent}: use` : 'Use'} <strong>{summary}</strong> on {target}?</span>
         {:else}
             <span class="title">{agent ? `${agent}: use` : 'Use'} <strong>{target}</strong>?</span>
         {/if}
@@ -27,6 +29,8 @@
         {#if subject === 'agent'}
             <p class="explain">It can then open tabs in the Nova group and read and use pages there. Each new site still needs your OK, and Stop always works.</p>
             <code class="command">First request: {summary}</code>
+        {:else if subject === 'action'}
+            <p class="explain">This may pay, send or delete something and cannot always be undone. Check the page before you allow it.</p>
         {:else}
             <code class="command">{summary}</code>
         {/if}
@@ -35,10 +39,12 @@
         {:else}
             <div class="buttons">
                 <button class="nova-button" onclick={() => onanswer('once')}>Allow</button>
-                <button class="nova-button secondary" onclick={() => onanswer('always')} title={subject === 'agent' ? `Always allow ${target}` : `Always allow Nova on ${target}`}>Always allow</button>
+                {#if subject !== 'action'}
+                    <button class="nova-button secondary" onclick={() => onanswer('always')} title={subject === 'agent' ? `Always allow ${target}` : `Always allow Nova on ${target}`}>Always allow</button>
+                {/if}
                 <button class="nova-button secondary" onclick={() => onanswer('deny')}>Deny</button>
             </div>
-            <p class="hint">{subject === 'agent' ? '"Allow" lasts until the browser closes.' : '"Allow" lasts until this task ends.'}</p>
+            <p class="hint">{subject === 'agent' ? '"Allow" lasts until the browser closes.' : subject === 'action' ? 'Nova asks again next time.' : '"Allow" lasts until this task ends.'}</p>
         {/if}
     </div>
 </div>
