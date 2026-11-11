@@ -1,0 +1,3 @@
+[submodule "packages/extension/src/lib/client-lib"]
+	path = packages/extension/src/lib/client-lib
+	url = https://gitlab.projectsource.nl/sourceregistry/svelte/client-lib.git

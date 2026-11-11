@@ -1,0 +1,32 @@
+// The settings page uses client-lib (the Nova platform's UI library) for its look.
+@use '$lib/client-lib/styles/app' with (
+  $primary-color: #6633ee,
+  $secondary-color: #2ecc71
+);
+
+// The shared controls (.nova-input, .nova-button, ...) read --nova-* tokens; point them at
+// client-lib's tokens so they follow its light/dark theme.
+:root {
+  --nova-bg: var(--color-background-primary);
+  --nova-fg: var(--color-text-primary);
+  --nova-muted: var(--color-text-muted);
+  --nova-border: var(--color-border-primary);
+  --nova-subtle-border: var(--color-border-primary);
+  --nova-surface: var(--color-background-secondary);
+  --nova-hover: var(--color-primary-soft);
+  --nova-focus: var(--color-primary);
+  --nova-button-bg: var(--color-primary);
+  --nova-button-fg: var(--color-primary-contrast);
+  --nova-input-bg: var(--color-background-tertiary);
+  --nova-input-fg: var(--color-text-primary);
+  --nova-input-border: var(--color-border-primary);
+  --nova-code-bg: var(--color-background-tertiary);
+  --nova-error: var(--color-danger);
+  --nova-success: var(--color-success);
+  --nova-warning: var(--color-warning);
+  --nova-font: 'Poppins', system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--nova-font);
+}

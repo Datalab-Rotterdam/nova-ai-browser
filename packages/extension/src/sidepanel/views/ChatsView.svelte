@@ -1,6 +1,7 @@
 <script lang="ts">
     // A smaller nova-ai-vscode webview/src/chat/ChatsPage.svelte: search, open and delete.
     import { onMount } from 'svelte';
+    import { chatToMarkdown } from '../../lib/export';
     import { allSessions, deleteSession, type StoredSession } from '../../lib/sessions';
 
     let { currentId, running, onopen, ondeleted }: {
@@ -23,6 +24,14 @@
     onMount(() => {
         void allSessions().then((list) => (sessions = list));
     });
+
+    let copied = $state<string | undefined>();
+
+    async function copyMarkdown(chat: StoredSession) {
+        await navigator.clipboard.writeText(chatToMarkdown(chat.title, chat.items, chat.updatedAt));
+        copied = chat.id;
+        setTimeout(() => (copied = undefined), 1200);
+    }
 
     async function remove(chat: StoredSession) {
         if (!confirm(`Delete "${chat.title || 'Untitled chat'}"?`)) return;
@@ -66,6 +75,12 @@
                     <span class="title">{chat.title || 'Untitled chat'}</span>
                     <span class="age">{chat.id === currentId ? 'open' : age(chat.updatedAt)}</span>
                 </button>
+                <button
+                        class={`nova-icon-button codicon codicon-${copied === chat.id ? 'check' : 'copy'} delete`}
+                        title="Copy chat as Markdown"
+                        aria-label={`Copy ${chat.title || 'Untitled chat'} as Markdown`}
+                        onclick={() => copyMarkdown(chat)}
+                ></button>
                 <button
                         class="nova-icon-button codicon codicon-trash delete"
                         title="Delete chat"

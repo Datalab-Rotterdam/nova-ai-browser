@@ -1,7 +1,17 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["chrome", "svelte", "vite/client"]
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["chrome", "svelte", "vite/client"],
+    "paths": {
+      "$lib/*": ["./src/lib/*"],
+      "@sveltejs/kit": ["./src/lib/shims/sveltejs-kit.ts"],
+      "$app/environment": ["./src/lib/shims/app-environment.ts"],
+      "$app/state": ["./src/lib/shims/app-state.ts"],
+      "$app/navigation": ["./src/lib/shims/app-navigation.ts"],
+      "$app/forms": ["./src/lib/shims/app-forms.ts"],
+      "@sourceregistry/sveltekit-service-manager/client": ["./src/lib/shims/service-manager-client.ts"]
+    }
   },
   "include": ["src", "*.ts"]
 }

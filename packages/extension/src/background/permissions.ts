@@ -1,12 +1,11 @@
 /**
- * Consent prompts. Three kinds:
+ * Consent prompts. Two kinds:
  * - agent: before an external agent (VS Code, Claude Code, …) may use the browser at all;
- * - site: before Nova reads or acts on a site for the first time;
- * - action: before every click or form input on a control that pays, sends, deletes or similar.
- * The user decides: allow (for this task or browser session), always allow, or deny; actions are
- * allowed once or denied. Prompts go to the side panel when it is open, otherwise to a small popup window.
+ * - site: before Nova reads or acts on a site for the first time.
+ * The user decides: allow (for this task or browser session), always allow, or deny. Prompts go
+ * to the side panel when it is open, otherwise to a small popup window.
  */
-import { isIrreversibleControl, type AgentClient, type PanelEvent, type PermissionDecision, type ToolCaller } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { matchSiteRule, type AgentClient, type PanelEvent, type PermissionDecision, type SiteRule, type ToolCaller } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { DEV_TOOLS } from '../lib/build';
 import { loadSettings } from '../lib/settings';
 
@@ -37,6 +36,11 @@ export function originOf(url: string): string | undefined {
     } catch {
         return undefined;
     }
+}
+
+/** The user's site rule for `url`, if any. */
+export async function siteRuleFor(url: string): Promise<SiteRule | undefined> {
+    return matchSiteRule((await loadSettings()).siteRules, url);
 }
 
 export async function storedDecisions(): Promise<Record<string, StoredDecision>> {
@@ -70,6 +74,10 @@ export async function ensureSiteAllowed(url: string, tool: string, summary: stri
         throw new Error(`Nova cannot use ${url}: only http(s) and file pages can be controlled.`);
     }
 
+    if ((await siteRuleFor(url))?.behavior === 'block') {
+        throw new Error(`A site rule blocks Nova on ${origin}. Do not try this site again; tell the user.`);
+    }
+
     const stored = (await storedDecisions())[origin];
     if (stored === 'deny') {
         throw new Error(`The user blocked Nova on ${origin}. Do not try this site again; tell the user.`);
@@ -77,7 +85,7 @@ export async function ensureSiteAllowed(url: string, tool: string, summary: stri
     if (stored === 'always' || (await sessionAllowed()).includes(origin)) return;
     // The agent's user approved this call there (the agent itself was approved here first); a blocked site stays blocked.
     if (client?.preApproved) return;
-    if (!(await loadSettings()).askBeforeActing || (DEV_TOOLS && caller === 'debug')) return;
+    if ((await loadSettings()).approvalMode === 'autoAll' || (DEV_TOOLS && caller === 'debug')) return;
 
     const decision = await requestDecision(`site:${origin}`, { kind: 'site', origin, tool, summary, agent: client?.name });
     if (decision === 'deny') {
@@ -91,22 +99,54 @@ export async function ensureSiteAllowed(url: string, tool: string, summary: stri
 }
 
 /**
- * Resolves when Nova may use `element` (as `page/resolve` describes it); asks the user every time
- * the control is hard to undo. The system prompt also says to ask first, but a model can ignore
- * that and a page can inject instructions, so this holds for every caller, external agents too.
+ * Asks before every upload, whatever the approval mode: a model (or a page injecting
+ * instructions) must never send local files to a site without the user seeing which ones.
+ * An agent whose user already approved this exact call (`preApproved`) is not asked twice.
  */
-export async function confirmIrreversible(url: string, element: string, tool: string, caller: ToolCaller, client?: AgentClient): Promise<void> {
-    if (!isIrreversibleControl(element) || (DEV_TOOLS && caller === 'debug')) return;
+export async function ensureUploadAllowed(url: string, files: string[], caller: ToolCaller, client?: AgentClient): Promise<void> {
     const origin = originOf(url) ?? url;
-    const decision = await requestDecision(`action:${origin}:${element}`, { kind: 'action', origin, tool, summary: element, agent: client?.name });
+    if (client?.preApproved || (DEV_TOOLS && caller === 'debug')) return;
+    const names = files.map((file) => file.split(/[\\/]/).pop() || file);
+    const decision = await requestDecision(`upload:${crypto.randomUUID()}`, {
+        kind: 'upload',
+        origin,
+        files,
+        tool: 'upload_file',
+        summary: `upload ${names.join(', ')}`,
+        agent: client?.name
+    });
     if (decision === 'deny') {
-        throw new Error(`The user did not allow using ${element} on ${origin}. Do not try it another way; ask the user how to continue.`);
+        throw new Error('The user did not allow this upload. Do not try again with other files; ask the user how to continue.');
+    }
+}
+
+/**
+ * Asks before a click or fill on something irreversible, whatever the approval mode, like uploads:
+ * a model (or a page injecting instructions) must never pay, send or delete without the user seeing it.
+ * An agent whose user already approved this call (`preApproved`) is not asked twice.
+ */
+export async function ensureActionConfirmed(url: string, element: string, tool: string, caller: ToolCaller, client?: AgentClient, force = false): Promise<void> {
+    const origin = originOf(url) ?? url;
+    // `force`: a site rule asks every time, even when the agent's own user already approved the call.
+    if ((client?.preApproved && !force) || (DEV_TOOLS && caller === 'debug')) return;
+    const decision = await requestDecision(`action:${crypto.randomUUID()}`, {
+        kind: 'action',
+        origin,
+        element,
+        tool,
+        summary: `${tool} ${element}`,
+        agent: client?.name
+    });
+    if (decision === 'deny') {
+        throw new Error(`The user did not allow this action (${element}). Do not try it again or another way; tell the user and ask how to continue.`);
     }
 }
 
 type PromptDetails =
-    | { kind: 'site' | 'action'; origin: string; tool: string; summary: string; agent?: string }
-    | { kind: 'agent'; client: AgentClient; tool: string; summary: string };
+    | { kind: 'site'; origin: string; tool: string; summary: string; agent?: string }
+    | { kind: 'agent'; client: AgentClient; tool: string; summary: string }
+    | { kind: 'upload'; origin: string; files: string[]; tool: string; summary: string; agent?: string }
+    | { kind: 'action'; origin: string; element: string; tool: string; summary: string; agent?: string };
 
 /** Shows one prompt per key; concurrent requests for the same key wait for the same answer. */
 export function requestDecision(key: string, details: PromptDetails): Promise<PermissionDecision> {
@@ -126,7 +166,7 @@ export function requestDecision(key: string, details: PromptDetails): Promise<Pe
         const entry: Pending = { resolve };
         pending.set(id, entry);
 
-        const timer = setTimeout(() => answerPermission(id, 'deny'), TIMEOUT_MS);
+        const timer = setTimeout(() => answerPermission(id, 'deny', true), TIMEOUT_MS);
         const originalResolve = entry.resolve;
         entry.resolve = (decision) => {
             clearTimeout(timer);
@@ -141,7 +181,9 @@ export function requestDecision(key: string, details: PromptDetails): Promise<Pe
                 summary: details.summary,
                 ...(details.kind === 'agent'
                     ? { agent: details.client.name }
-                    : { origin: details.origin, agent: details.agent ?? '' })
+                    : { origin: details.origin, agent: details.agent ?? '' }),
+                ...(details.kind === 'upload' ? { files: details.files.join('\n') } : {}),
+                ...(details.kind === 'action' ? { element: details.element } : {})
             });
             void chrome.windows.create({
                 url: chrome.runtime.getURL(`src/permission/index.html?${params}`),
@@ -156,14 +198,21 @@ export function requestDecision(key: string, details: PromptDetails): Promise<Pe
     });
 }
 
-export function answerPermission(id: string, decision: PermissionDecision): void {
+export function answerPermission(id: string, decision: PermissionDecision, timedOut = false): void {
     const entry = pending.get(id);
     if (!entry) return;
     pending.delete(id);
     entry.resolve(decision);
-    broadcast({ type: 'permission/resolved', id });
+    broadcast({ type: 'permission/resolved', id, ...(timedOut ? { timedOut } : {}) });
     if (entry.windowId !== undefined) {
         void chrome.windows.remove(entry.windowId).catch(() => undefined);
+    }
+}
+
+/** Allows the site prompts still waiting for this task, e.g. when the user switches to "Allow all". */
+export function allowPendingSites(): void {
+    for (const id of Array.from(pending.keys())) {
+        if (id.startsWith('site:')) answerPermission(id, 'once');
     }
 }
 

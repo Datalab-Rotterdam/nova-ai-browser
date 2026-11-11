@@ -163,3 +163,7 @@ release/
 # OS and editor files
 .DS_Store
 .idea/
+
+
+# svelte-check cache
+.svelte-check/

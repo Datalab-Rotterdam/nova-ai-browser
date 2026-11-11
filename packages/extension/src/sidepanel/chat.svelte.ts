@@ -1,21 +1,35 @@
-import { effortFor, errorResult, modelCapabilities, type PanelEvent, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { addUsage, EMPTY_USAGE, effortFor, errorResult, modelCapabilities, type PanelEvent, type ToolResult, type Usage } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { NovaAI, NovaAIError, type ChatMessage, type ModelResponse } from '@datalabrotterdam/nova-sdk';
 import { answerPermission, callTool, releaseTabs, setAgentRunning } from '../lib/bridge';
 import { latestSession, loadSession, saveSession, type StoredSession } from '../lib/sessions';
 import { saveSettings, type Settings } from '../lib/settings';
+import { ASK_USER, type Question } from './agent/ask';
+import { TODO_WRITE, type TodoItem } from './agent/todos';
 import { NovaBrowserAgent, type ToolCall } from './agent/loop';
 
 export type ChatItem =
     /** `steered`: sent while Nova was working and handed to it at its next step. */
     | { kind: 'user'; id: number; text: string; steered?: boolean }
-    | { kind: 'assistant'; id: number; text: string; thinking: string }
+    | { kind: 'assistant'; id: number; text: string }
+    /** The model's reasoning; `durationMs` is set once it is done. */
+    | { kind: 'thinking'; id: number; text: string; durationMs?: number }
     | { kind: 'tool'; id: number; call: ToolCall; result?: ToolResult }
+    /**
+     * A question from the ask_user tool. `closed`: Nova stopped (or the panel closed) before
+     * the user answered.
+     */
+    | (Question & { kind: 'question'; id: number; status: 'pending' | 'answered' | 'skipped' | 'closed'; answer?: string })
     | {
         kind: 'permission';
         id: number;
         requestId: string;
-        /** "site": may Nova use this site; "agent": may this external agent use the browser; "action": may Nova use this control (pay, send, delete, …). */
-        subject: 'site' | 'agent' | 'action';
+        /**
+         * "site": may Nova use this site; "agent": may this external agent use the browser;
+         * "upload": may these local files be uploaded to this site; "action": may Nova do this irreversible thing (summary is the element).
+         */
+        subject: 'site' | 'agent' | 'upload' | 'action';
+        /** For upload prompts: the absolute file paths. */
+        files?: string[];
         /** The site's origin or the agent's name. */
         target: string;
         /** For site prompts on behalf of an external agent. */
@@ -38,13 +52,23 @@ export interface QueuedMessage {
 
 let nextId = 1;
 
+type QuestionItem = Extract<ChatItem, { kind: 'question' }>;
+
 export class ChatSession {
     items = $state<ChatItem[]>([]);
     running = $state(false);
+    /** Nova's task list (todo_write); empty when there is none or the user closed it. */
+    todos = $state<TodoItem[]>([]);
+    /** Tokens and cost of this chat so far. */
+    usage = $state<Usage>(EMPTY_USAGE);
+    /** The ask_user question waiting for an answer. */
+    question = $state<QuestionItem | undefined>();
     models = $state<ModelResponse[]>([]);
     modelsError = $state<string | undefined>();
     queue = $state<QueuedMessage[]>([]);
 
+    /** Read-only ("Ask") mode, copied from the settings at every send so it applies to a running chat. */
+    private readOnlyMode = false;
     private agent: NovaBrowserAgent | undefined;
     /** Set when the user pressed Stop: queued messages then wait instead of running automatically. */
     private stoppedByUser = false;
@@ -55,6 +79,8 @@ export class ChatSession {
     private createdAt = Date.now();
     /** The model conversation of a restored chat, until the first run creates an agent with it. */
     private restoredHistory: ChatMessage[] | undefined;
+    /** Hands the answer to the waiting ask_user call. */
+    private resolveQuestion: ((answer: string | undefined) => void) | undefined;
 
     /** Reopens the most recent chat, e.g. after the panel was closed. */
     async restore(): Promise<void> {
@@ -77,15 +103,29 @@ export class ChatSession {
 
     private show(session: StoredSession): void {
         for (const item of session.items) {
+            nextId = Math.max(nextId, item.id + 1);
+        }
+        const items: ChatItem[] = [];
+        for (const item of session.items) {
             // Prompts and tool calls that were open when the panel closed cannot finish any more.
             if (item.kind === 'permission' && !item.answered) item.answered = 'Expired';
             if (item.kind === 'tool' && !item.result) item.result = errorResult('Interrupted: the side panel was closed.');
-            nextId = Math.max(nextId, item.id + 1);
+            if (item.kind === 'question' && item.status === 'pending') item.status = 'closed';
+            // Chats saved before thinking had its own item kept it on the answer.
+            const legacy = item as ChatItem & { thinking?: string };
+            if (item.kind === 'assistant' && legacy.thinking !== undefined) {
+                if (legacy.thinking.trim()) items.push({ kind: 'thinking', id: nextId++, text: legacy.thinking });
+                delete legacy.thinking;
+                if (!item.text.trim()) continue;
+            }
+            items.push(item);
         }
-        this.items = session.items;
+        this.items = items;
         this.sessionId = session.id;
         this.createdAt = session.createdAt;
         this.restoredHistory = session.history;
+        this.todos = session.todos ?? [];
+        this.usage = session.usage ?? EMPTY_USAGE;
     }
 
     private save(): void {
@@ -98,8 +138,19 @@ export class ChatSession {
             updatedAt: Date.now(),
             model: this.lastSettings?.model ?? '',
             items: this.items,
-            history: this.agent?.history ?? this.restoredHistory ?? []
+            history: this.agent?.history ?? this.restoredHistory ?? [],
+            ...(this.todos.length ? { todos: this.todos } : {}),
+            ...(this.usage.requests ? { usage: $state.snapshot(this.usage) } : {})
         }).catch(() => undefined);
+    }
+
+    /** Shows a line in the conversation. */
+    notify(text: string, tone: 'info' | 'error' = 'info'): void {
+        this.push({ kind: 'notice', id: 0, text, tone });
+    }
+
+    setReadOnly(on: boolean): void {
+        this.readOnlyMode = on;
     }
 
     async loadModels(settings: Settings): Promise<void> {
@@ -156,6 +207,8 @@ export class ChatSession {
         this.stop();
         this.items = [];
         this.queue = [];
+        this.todos = [];
+        this.usage = EMPTY_USAGE;
         this.agent = undefined;
         this.restoredHistory = undefined;
         this.sessionId = crypto.randomUUID();
@@ -179,11 +232,15 @@ export class ChatSession {
             case 'permission/request':
                 this.push(event.kind === 'agent'
                     ? { kind: 'permission', id: 0, requestId: event.id, subject: 'agent', target: event.client.name, tool: event.tool, summary: event.summary }
-                    : { kind: 'permission', id: 0, requestId: event.id, subject: event.kind, target: event.origin, agent: event.agent, tool: event.tool, summary: event.summary });
+                    : event.kind === 'action'
+                        ? { kind: 'permission', id: 0, requestId: event.id, subject: 'action', target: event.origin, agent: event.agent, tool: event.tool, summary: event.element }
+                    : event.kind === 'upload'
+                        ? { kind: 'permission', id: 0, requestId: event.id, subject: 'upload', target: event.origin, agent: event.agent, files: event.files, tool: event.tool, summary: event.summary }
+                        : { kind: 'permission', id: 0, requestId: event.id, subject: 'site', target: event.origin, agent: event.agent, tool: event.tool, summary: event.summary });
                 break;
             case 'permission/resolved':
                 for (const item of this.items) {
-                    if (item.kind === 'permission' && item.requestId === event.id && !item.answered) item.answered = 'answered';
+                    if (item.kind === 'permission' && item.requestId === event.id && !item.answered) item.answered = event.timedOut ? 'No answer after 3 minutes: counted as denied' : 'answered';
                 }
                 break;
         }
@@ -192,14 +249,62 @@ export class ChatSession {
     async answer(item: Extract<ChatItem, { kind: 'permission' }>, decision: 'once' | 'always' | 'deny'): Promise<void> {
         item.answered = decision === 'deny' ? 'Denied'
             : decision === 'always' ? 'Always allowed'
-                : item.subject === 'agent' ? 'Allowed until the browser closes' : item.subject === 'action' ? 'Allowed' : 'Allowed for this task';
+                : item.subject === 'agent' ? 'Allowed until the browser closes'
+                    : item.subject === 'upload' ? 'Upload allowed' : item.subject === 'action' ? 'Action allowed' : 'Allowed for this task';
         await answerPermission(item.requestId, decision);
+    }
+
+    /**
+     * Shows an ask_user question and waits for the answer (undefined when skipped). Stop closes
+     * it; the agent then ends the run.
+     */
+    ask(question: Question, signal: AbortSignal): Promise<string | undefined> {
+        return new Promise((resolve) => {
+            const item = this.push({ kind: 'question', id: 0, ...question, status: 'pending' }) as QuestionItem;
+            const onAbort = () => this.closeQuestion(item, 'closed', undefined);
+            signal.addEventListener('abort', onAbort, { once: true });
+            this.question = item;
+            this.resolveQuestion = (answer) => {
+                signal.removeEventListener('abort', onAbort);
+                resolve(answer);
+            };
+            this.save();
+        });
+    }
+
+    /** The user closed the task list; Nova's next update shows it again. */
+    dismissTodos(): void {
+        this.todos = [];
+        this.save();
+    }
+
+    /** The user's answer to the open question; empty skips it. */
+    answerQuestion(item: QuestionItem, answer: string | undefined): void {
+        const text = answer?.trim();
+        this.closeQuestion(item, text ? 'answered' : 'skipped', text || undefined);
+    }
+
+    private closeQuestion(item: QuestionItem, status: QuestionItem['status'], answer: string | undefined): void {
+        if (!this.question || this.question.id !== item.id) return;
+        const resolve = this.resolveQuestion;
+        this.question.status = status;
+        if (answer !== undefined) this.question.answer = answer;
+        this.question = undefined;
+        this.resolveQuestion = undefined;
+        resolve?.(answer);
+        this.save();
     }
 
     /** Sends a message, or queues it as steering when Nova is already working. */
     async send(text: string, settings: Settings): Promise<void> {
         const prompt = text.trim();
         if (!prompt) return;
+        this.readOnlyMode = settings.readOnly;
+        // A pending question is answered by whatever the user types.
+        if (this.question) {
+            this.answerQuestion(this.question, prompt);
+            return;
+        }
         if (this.running) {
             this.queue.push({ id: nextId++, text: prompt, mode: 'steer' });
             return;
@@ -275,6 +380,12 @@ export class ChatSession {
                 effort,
                 maxRounds: settings.maxRounds,
                 runTool: (call) => callTool(call.name, call.args, 'sidepanel'),
+                readOnly: () => this.readOnlyMode,
+                ask: (question, signal) => this.ask(question, signal),
+                setTodos: (todos) => {
+                    this.todos = todos;
+                    this.save();
+                },
                 takeSteering: () => this.takeSteering(),
                 // Keep the conversation when settings change (e.g. another model) or a chat was restored.
                 history: this.agent?.history ?? this.restoredHistory
@@ -289,21 +400,43 @@ export class ChatSession {
         const signal = this.controller.signal;
         await setAgentRunning(true);
 
+        // Thinking and answer text of the current model response, each its own item, in the order they arrive.
         let current: Extract<ChatItem, { kind: 'assistant' }> | undefined;
-        const assistant = () => {
-            if (!current) {
-                current = this.push({ kind: 'assistant', id: 0, text: '', thinking: '' }) as Extract<ChatItem, { kind: 'assistant' }>;
+        let thought: { item: Extract<ChatItem, { kind: 'thinking' }>; startedAt: number } | undefined;
+        const endThinking = () => {
+            if (thought) thought.item.durationMs = Date.now() - thought.startedAt;
+            thought = undefined;
+        };
+        const endResponse = () => {
+            endThinking();
+            if (current && !current.text.trim()) {
+                const blank = current;
+                this.items = this.items.filter((item) => item.id !== blank.id);
             }
-            return current;
+            current = undefined;
         };
         const toolItems = new Map<string, Extract<ChatItem, { kind: 'tool' }>>();
 
         try {
             await this.agent.run(prompt, {
-                text: (delta) => { assistant().text += delta; },
-                thinking: (delta) => { assistant().thinking += delta; },
+                text: (delta) => {
+                    endThinking();
+                    current ??= this.push({ kind: 'assistant', id: 0, text: '' }) as Extract<ChatItem, { kind: 'assistant' }>;
+                    current.text += delta;
+                },
+                thinking: (delta) => {
+                    if (!thought) {
+                        // Thinking after some answer text starts a new step below it.
+                        current = undefined;
+                        thought = { item: this.push({ kind: 'thinking', id: 0, text: '' }) as Extract<ChatItem, { kind: 'thinking' }>, startedAt: Date.now() };
+                    }
+                    thought.item.text += delta;
+                },
                 toolStart: (call) => {
-                    current = undefined;
+                    endResponse();
+                    // A question gets its own card (see ask), not a tool card.
+                    // The task list has its own strip above the composer.
+                    if (call.name === ASK_USER || call.name === TODO_WRITE) return;
                     toolItems.set(call.id, this.push({ kind: 'tool', id: 0, call }) as Extract<ChatItem, { kind: 'tool' }>);
                 },
                 toolEnd: (call, result) => {
@@ -312,13 +445,19 @@ export class ChatSession {
                     this.save();
                 },
                 roundEnd: () => {
-                    if (current && !current.text.trim() && !current.thinking.trim()) {
-                        this.items = this.items.filter((item) => item.id !== current!.id);
-                    }
-                    current = undefined;
+                    endResponse();
                     this.save();
                 },
-                notice: (text) => { this.push({ kind: 'notice', id: 0, text, tone: 'info' }); }
+                notice: (text) => { this.push({ kind: 'notice', id: 0, text, tone: 'info' }); },
+                usage: (request) => {
+                    const model = this.models.find((candidate) => candidate.id === settings.model);
+                    this.usage = addUsage(this.usage, request, model && {
+                        inputPer1m: model.input_cost_per_1m,
+                        outputPer1m: model.output_cost_per_1m,
+                        currency: model.currency
+                    });
+                    this.save();
+                }
             }, signal);
         } catch (error) {
             if (!signal.aborted) {
@@ -328,6 +467,7 @@ export class ChatSession {
                 this.push({ kind: 'notice', id: 0, text: message, tone: 'error' });
             }
         } finally {
+            endResponse();
             this.running = false;
             this.controller = undefined;
             this.save();

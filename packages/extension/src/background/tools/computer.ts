@@ -3,8 +3,9 @@ import { loadSettings } from '../../lib/settings';
 import { overlay, pageRequest } from '../content';
 import { click, drag, hover, parseModifiers, pressKeys, scroll, typeText, type MouseButton } from '../input';
 import { fullPageScreenshot, geometryFor, screenshot, toCssPoint, zoom } from '../screenshot';
-import { confirmIrreversible } from '../permissions';
+import { ensureActionConfirmed } from '../permissions';
 import { settle } from '../tabs';
+import { irreversibleAction } from './checks';
 import type { ToolContext } from './context';
 
 const CLICKS: Record<string, { button: MouseButton; clickCount: number; verb: string; done: string }> = {
@@ -83,7 +84,9 @@ export async function computer(ctx: ToolContext, args: Record<string, unknown>):
     if (action in CLICKS) {
         const spec = CLICKS[action];
         const where = await target(ctx, args);
-        await confirmIrreversible(ctx.tab.url ?? '', where.description, `computer ${action}`, ctx.caller, ctx.client);
+        if (!ctx.actionConfirmed && irreversibleAction(where.description)) {
+            await ensureActionConfirmed(ctx.tab.url ?? '', where.description, action, ctx.caller, ctx.client);
+        }
         await click(tabId, where.point, {
             button: spec.button,
             clickCount: spec.clickCount,

@@ -1,18 +1,26 @@
 <script lang="ts">
     // Same composer as nova-ai-vscode (webview/src/chat/Composer.svelte), with browser actions in the toolbar.
+    import { matchShortcuts, type Shortcut } from '@datalabrotterdam/nova-ai-browser-protocol';
     import type { ModelResponse } from '@datalabrotterdam/nova-sdk';
+    import type { ApprovalMode } from '../../lib/settings';
     import type { QueuedMessage } from '../chat.svelte';
     import ModelMenu from './ModelMenu.svelte';
+    import PermissionMenu from './PermissionMenu.svelte';
 
     interface Props {
         running: boolean;
+        /** Nova waits for the answer to a question: sending answers it. */
+        asking?: boolean;
         disabled: boolean;
         models: ModelResponse[];
         modelId: string;
         effort: string;
         vision: boolean;
+        approvalMode: ApprovalMode;
         value?: string;
         queue: QueuedMessage[];
+        /** Saved prompts offered while typing /name. */
+        shortcuts?: Shortcut[];
         onsend: (text: string) => void;
         onqueuemode: (id: number, mode: QueuedMessage['mode']) => void;
         onqueueremove: (id: number) => void;
@@ -20,10 +28,11 @@
         onstop: () => void;
         onmodel: (modelId: string) => void;
         oneffort: (effort: string) => void;
+        onapprovalmode: (mode: ApprovalMode) => void;
         onusetab: () => void;
     }
 
-    let { running, disabled, models, modelId, effort, vision, value = $bindable(''), queue, onsend, onqueuemode, onqueueremove, onqueuesendnow, onstop, onmodel, oneffort, onusetab }: Props = $props();
+    let { running, asking = false, disabled, models, modelId, effort, vision, approvalMode, value = $bindable(''), queue, shortcuts = [], onsend, onqueuemode, onqueueremove, onqueuesendnow, onstop, onmodel, oneffort, onapprovalmode, onusetab }: Props = $props();
     let textarea: HTMLTextAreaElement | undefined = $state();
 
     // While Nova works, sending queues the message as steering (nothing is interrupted).
@@ -36,7 +45,37 @@
         resize();
     }
 
+    const suggestions = $derived(matchShortcuts(value, shortcuts));
+    let active = $state(0);
+    $effect(() => {
+        void suggestions.length;
+        active = 0;
+    });
+
+    function pick(shortcut: Shortcut) {
+        value = `/${shortcut.name} `;
+        textarea?.focus();
+    }
+
     function onKeydown(event: KeyboardEvent) {
+        if (suggestions.length && !event.isComposing) {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                active = (active + (event.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length;
+                return;
+            }
+            // Tab always completes; Enter completes unless the whole name is already typed.
+            if (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey && value.trim() !== `/${suggestions[active].name}`)) {
+                event.preventDefault();
+                pick(suggestions[active]);
+                return;
+            }
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                value = '';
+                return;
+            }
+        }
         if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
             event.preventDefault();
             send();
@@ -82,6 +121,18 @@
             {/each}
         </ul>
     {/if}
+    {#if suggestions.length}
+        <ul class="suggest" role="listbox" aria-label="Shortcuts">
+            {#each suggestions as shortcut, index (shortcut.id)}
+                <li role="option" aria-selected={index === active}>
+                    <button type="button" class:active={index === active} onmousedown={(event) => { event.preventDefault(); pick(shortcut); }}>
+                        <span class="name">/{shortcut.name}</span>
+                        <span class="prompt">{shortcut.prompt}</span>
+                    </button>
+                </li>
+            {/each}
+        </ul>
+    {/if}
     <form class="composer" onsubmit={(event) => { event.preventDefault(); send(); }}>
         <textarea
                 bind:this={textarea}
@@ -90,7 +141,7 @@
                 onkeydown={onKeydown}
                 rows="1"
                 disabled={disabled}
-                placeholder={disabled ? 'Connect Nova AI to start' : running ? 'Steer Nova or queue a follow-up…' : 'Ask Nova to do something in your browser…'}
+                placeholder={disabled ? 'Connect Nova AI to start' : asking ? 'Answer Nova’s question…' : running ? 'Steer Nova or queue a follow-up…' : 'Ask Nova to do something in your browser…'}
                 aria-label="Message Nova"
         ></textarea>
 
@@ -111,7 +162,7 @@
                     <span class="stop-square" aria-hidden="true"></span>
                 </button>
                 {#if canSend}
-                    <button class="send" type="submit" title="Steer Nova (Enter)" aria-label="Steer Nova">
+                    <button class="send" type="submit" title={asking ? 'Answer (Enter)' : 'Steer Nova (Enter)'} aria-label={asking ? 'Answer' : 'Steer Nova'}>
                         <span class="codicon codicon-send" aria-hidden="true"></span>
                     </button>
                 {/if}
@@ -122,9 +173,56 @@
             {/if}
         </div>
     </form>
+
+    <!-- Under the message box, like nova-ai-vscode's ModeMenu status row. -->
+    <div class="status">
+        <PermissionMenu mode={approvalMode} onmode={onapprovalmode} />
+    </div>
 </div>
 
 <style lang="scss">
+  .suggest {
+    margin: 0 0 4px;
+    padding: 2px;
+    list-style: none;
+    border: 1px solid var(--nova-border);
+    border-radius: var(--nova-radius-large);
+    background: var(--nova-surface);
+
+    button {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      width: 100%;
+      padding: 4px 8px;
+      border: 0;
+      border-radius: var(--nova-radius);
+      background: transparent;
+      color: var(--nova-fg);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+
+      &.active,
+      &:hover {
+        background: var(--nova-hover);
+      }
+    }
+
+    .name {
+      flex: none;
+      font-weight: 600;
+    }
+
+    .prompt {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--nova-muted);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
   /*
    * Same effect as the Nova platform chat bar: while Nova works, a soft primary-colored
    * radial glow (::before) and a slowly orbiting conic gradient (::after) fade in behind
@@ -286,6 +384,14 @@
 
   .spacer {
     flex: 1;
+  }
+
+  .status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    padding: 2px 4px 0;
   }
 
   .icon {

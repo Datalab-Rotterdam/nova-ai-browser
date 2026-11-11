@@ -20,11 +20,19 @@ import {
     isContextOverflow,
     isToolCallingRejected,
     parseContextLimit,
+    readUsage,
     resultText,
+    errorResult,
+    textResult,
     TOOL_DEFINITIONS,
+    type RequestUsage,
+    type ToolDefinition,
     type ToolResult
 } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { answerText, ASK_USER, ASK_USER_TOOL, parseQuestion, type Question } from './ask';
 import { COMPACTION_PROMPT, systemPrompt } from './prompt';
+import { readOnlyRefusal } from './readonly';
+import { parseTodos, TODO_WRITE, TODO_WRITE_TOOL, todosText, type TodoItem } from './todos';
 
 const KEPT_IMAGES = 2;
 const IMAGE_PLACEHOLDER = '[older screenshot removed to save context]';
@@ -47,6 +55,8 @@ export interface AgentEvents {
     /** A model response finished; a new assistant bubble should start for the next one. */
     roundEnd(): void;
     notice(text: string): void;
+    /** What one model request used (tokens), when the server reports it. */
+    usage?(request: RequestUsage): void;
 }
 
 export interface AgentOptions {
@@ -60,6 +70,15 @@ export interface AgentOptions {
     /** The model's context window in tokens, when it advertises one. */
     contextWindow?: number;
     runTool(call: ToolCall): Promise<ToolResult>;
+    /** True while read-only ("Ask") mode is on; checked on every call so the setting applies mid-chat. */
+    readOnly?(): boolean;
+    /**
+     * Shows a question from the `ask_user` tool and resolves with the answer, or undefined when
+     * the user skipped it. Without it the model does not get the tool.
+     */
+    ask?(question: Question, signal: AbortSignal): Promise<string | undefined>;
+    /** Shows the task list from the `todo_write` tool. Without it the model does not get the tool. */
+    setTodos?(todos: TodoItem[]): void;
     /**
      * Messages the user sent while Nova works ("steering"). Called before every model call
      * after the first; they join the conversation as user messages.
@@ -78,12 +97,19 @@ export class NovaBrowserAgent {
     private lastSignature = '';
     private repeats = 0;
     private contextWindow: number;
+    private readonly tools: readonly ToolDefinition[];
 
     public constructor(private readonly options: AgentOptions) {
         // Bind fetch: extension pages throw "Illegal invocation" for an unbound window.fetch.
         this.client = new NovaAI({ apiKey: options.apiKey, baseUrl: options.baseUrl, fetch: (input, init) => fetch(input, init) });
         this.history = options.history ?? [];
         this.contextWindow = options.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
+        // Panel-only tools come with the panel's callbacks; external agents never see them.
+        this.tools = [
+            ...TOOL_DEFINITIONS,
+            ...(options.ask ? [ASK_USER_TOOL] : []),
+            ...(options.setTodos ? [TODO_WRITE_TOOL] : [])
+        ];
     }
 
     public async run(prompt: string, events: AgentEvents, signal: AbortSignal): Promise<void> {
@@ -133,7 +159,7 @@ export class NovaBrowserAgent {
             for (const call of response.calls) {
                 signal.throwIfAborted();
                 events.toolStart(call);
-                const result = await this.options.runTool(call);
+                const result = await this.runCall(call, signal);
                 events.toolEnd(call, result);
                 let text = this.resultForModel(result);
 
@@ -141,7 +167,7 @@ export class NovaBrowserAgent {
                 const signature = JSON.stringify([call.name, call.args]);
                 this.repeats = signature === this.lastSignature ? this.repeats + 1 : 1;
                 this.lastSignature = signature;
-                const repeatable = call.name === 'computer' && (call.args.action === 'scroll' || call.args.action === 'wait');
+                const repeatable = call.name === ASK_USER || call.name === TODO_WRITE || call.name === 'wait_for' || (call.name === 'computer' && (call.args.action === 'scroll' || call.args.action === 'wait'));
                 if (this.repeats >= 3 && !repeatable) {
                     text += `\n\nNote: you have made this exact call ${this.repeats} times in a row. If the page is not changing, stop repeating it and try a different approach (other tool, ref, keyboard, or ask the user).`;
                 }
@@ -167,6 +193,34 @@ export class NovaBrowserAgent {
         }
 
         events.notice(`Stopped after ${this.options.maxRounds} steps. Say "continue" to let Nova go on.`);
+    }
+
+    /** Answers `ask_user` and `todo_write` in the panel; every other tool goes to the browser. */
+    private async runCall(call: ToolCall, signal: AbortSignal): Promise<ToolResult> {
+        const refusal = this.options.readOnly?.() ? readOnlyRefusal(call.name, call.args) : undefined;
+        if (refusal) return errorResult(refusal);
+        if (call.name === TODO_WRITE && this.options.setTodos) {
+            try {
+                const todos = parseTodos(call.args);
+                this.options.setTodos(todos);
+                return textResult(todosText(todos));
+            } catch (error) {
+                return errorResult((error as Error).message);
+            }
+        }
+        if (call.name !== ASK_USER || !this.options.ask) {
+            return this.options.runTool(call);
+        }
+        let question: Question;
+        try {
+            question = parseQuestion(call.args);
+        } catch (error) {
+            return errorResult((error as Error).message);
+        }
+        const answer = await this.options.ask(question, signal);
+        // Stop while the question was open: end the run instead of telling the model it was skipped.
+        signal.throwIfAborted();
+        return textResult(answerText(answer));
     }
 
     /**
@@ -219,7 +273,7 @@ export class NovaBrowserAgent {
 
     /** Replaces the history with a compacted copy once it outgrows `threshold` of the input budget. */
     private async compact(events: AgentEvents, signal: AbortSignal, threshold: number, budgetShare = 1): Promise<void> {
-        const fixed = estimateTextTokens(this.systemPrompt()) + (this.textTools ? 0 : estimateTextTokens(JSON.stringify(createToolPayload(TOOL_DEFINITIONS).payload)));
+        const fixed = estimateTextTokens(this.systemPrompt()) + (this.textTools ? 0 : estimateTextTokens(JSON.stringify(createToolPayload(this.tools).payload)));
         const budget = Math.max(1_024, Math.floor((inputBudget(this.contextWindow) - fixed) * budgetShare));
         const fitted = await fitToBudget(pruneImages(this.history, this.keptImages()), {
             budget,
@@ -249,7 +303,7 @@ export class NovaBrowserAgent {
     }
 
     private systemPrompt(): string {
-        return systemPrompt({ vision: this.options.vision, textTools: this.textTools, now: new Date() });
+        return systemPrompt({ vision: this.options.vision, textTools: this.textTools, tools: this.tools, now: new Date(), readOnly: this.options.readOnly?.() ?? false });
     }
 
     private keptImages(): number {
@@ -257,7 +311,7 @@ export class NovaBrowserAgent {
     }
 
     private async stream(events: AgentEvents, signal: AbortSignal): Promise<{ calls: ToolCall[] }> {
-        const tools = createToolPayload(TOOL_DEFINITIONS);
+        const tools = createToolPayload(this.tools);
         const calls: ToolCall[] = [];
         let text = '';
 
@@ -283,15 +337,19 @@ export class NovaBrowserAgent {
                 model: this.options.model,
                 messages,
                 ...(this.textTools ? {} : tools.payload),
+                stream_options: { include_usage: true },
                 ...(this.options.effort ? { reasoning_effort: this.options.effort } : {})
             },
             { signal }
         );
+        let used: RequestUsage | undefined;
         for await (const event of stream) {
             if (event.type === 'chunk') {
                 parser.pushChunk(event.data);
+                used = readUsage(event.data) ?? used;
             }
         }
+        if (used) events.usage?.(used);
         parser.end();
 
         if (this.textTools) {

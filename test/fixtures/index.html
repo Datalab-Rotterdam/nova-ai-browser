@@ -62,6 +62,20 @@
   <textarea id="notes" aria-label="Notes"></textarea>
 </section>
 
+<section>
+  <table id="prices">
+    <caption>Prices</caption>
+    <thead><tr><th>Item</th><th>Price</th></tr></thead>
+    <tbody>
+      <tr><td>Milk</td><td>1.20</td></tr>
+      <tr><td rowspan="2">Bread</td><td>2.50</td></tr>
+      <tr><td>3.10</td></tr>
+    </tbody>
+  </table>
+  <button id="later">Show later</button> <span id="later-text"></span>
+  <div><button id="cv-button">Upload CV</button><input id="cv" type="file" hidden> <span id="cv-name"></span></div>
+</section>
+
 <div id="spacer"></div>
 <button id="bottom">Bottom button</button>
 
@@ -81,6 +95,14 @@
   window.addEventListener('mouseup', () => { start = undefined; });
   document.getElementById('bottom').addEventListener('click', () => { document.body.dataset.bottom = 'clicked'; });
   document.addEventListener('keydown', (e) => { document.body.dataset.lastKey = e.key; });
+  document.getElementById('later').addEventListener('click', () => {
+    setTimeout(() => { document.getElementById('later-text').textContent = 'Loaded later'; }, 800);
+  });
+  document.getElementById('cv-button').addEventListener('click', () => document.getElementById('cv').click());
+  document.getElementById('cv').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    document.getElementById('cv-name').textContent = file ? `${file.name} ${file.size}` : '';
+  });
 </script>
 </body>
 </html>

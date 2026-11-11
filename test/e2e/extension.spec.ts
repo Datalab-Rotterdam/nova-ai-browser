@@ -6,7 +6,7 @@
  * NOVA_E2E_CHANNEL=msedge (or chrome-beta, …) to use an installed one that allows --load-extension.
  */
 import { chromium, expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -125,7 +125,8 @@ test('clicking a pay button asks the user first, and a denial stops it', async (
         ['computer', { tabId, action: 'left_click', ref }, caller] as const) as Promise<ToolResult>;
 
     const denied = click('sidepanel');
-    const card = panel.getByRole('group', { name: 'Confirm button "Pay now"' });
+    const card = panel.getByRole('group', { name: /^Confirm action on / });
+    await expect(card).toContainText('Pay now');
     await expect(card.getByRole('button', { name: 'Always allow' })).toHaveCount(0);
     await card.getByRole('button', { name: 'Deny' }).click();
     expect((await denied).isError).toBe(true);
@@ -133,12 +134,15 @@ test('clicking a pay button asks the user first, and a denial stops it', async (
     await expect(page.locator('#paid')).toHaveText('no');
 
     const allowed = click('sidepanel');
-    await panel.getByRole('group', { name: 'Confirm button "Pay now"' }).last().getByRole('button', { name: 'Allow', exact: true }).click();
+    await panel.getByRole('group', { name: /^Confirm action on / }).last().getByRole('button', { name: 'Allow', exact: true }).click();
     expect((await allowed).isError).toBeFalsy();
     await expect(page.locator('#paid')).toHaveText('yes');
 
-    await panel.evaluate(() => chrome.storage.local.clear());
-    await panel.reload();
+    // Only the settings this test set: the site permissions granted at the start stay.
+    await panel.evaluate(() => chrome.storage.local.remove('settings'));
+    // Reloading the panel starts a new chat, which gives the fixture tab back; hand it over again.
+    await page.bringToFront();
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/add-current' }));
 });
 
 test('screenshot coordinates map back to CSS pixels', async () => {
@@ -220,6 +224,31 @@ test('scroll and scroll_to', async () => {
     await expect(page.locator('body')).toHaveAttribute('data-bottom', 'clicked');
 });
 
+test('extract_table, wait_for, highlight and upload_file', async () => {
+    const table = text(await tool('extract_table', { tabId, format: 'csv' }));
+    expect(table).toContain('"Prices"');
+    expect(table).toContain('Item,Price\nMilk,1.20\nBread,2.50\nBread,3.10');
+
+    const tree = text(await tool('read_page', { tabId }));
+    await tool('computer', { tabId, action: 'left_click', ref: refFor(tree, /button "Show later"/) });
+    const waited = await tool('wait_for', { tabId, text: 'loaded LATER', timeout: 5 });
+    expect(waited.isError, text(waited)).toBeFalsy();
+    const missing = await tool('wait_for', { tabId, text: 'Never on the page', timeout: 1 });
+    expect(missing.isError).toBe(true);
+    expect(text(missing)).toContain('Timed out after 1 s');
+    expect(text(await tool('wait_for', { tabId, selector: '#later-text', network_idle: true }))).toContain('Done waiting');
+
+    expect(text(await tool('highlight', { tabId, text: 'Loaded later', label: 'Here it is' }))).toContain('Highlighted');
+    expect((await tool('highlight', { tabId, text: 'Never on the page' })).isError).toBe(true);
+
+    const file = join(mkdtempSync(join(tmpdir(), 'nova-upload-')), 'cv.txt');
+    writeFileSync(file, 'hello');
+    const uploaded = await tool('upload_file', { tabId, ref: refFor(tree, /button "Upload CV"/), paths: [file] });
+    expect(text(uploaded)).toContain('cv.txt (5 B)');
+    await expect(page.locator('#cv-name')).toHaveText('cv.txt 5');
+    expect((await tool('upload_file', { tabId, ref: refFor(tree, /button "Upload CV"/), paths: ['cv.txt'] })).isError).toBe(true);
+});
+
 test('get_page_text and navigate', async () => {
     expect(text(await tool('get_page_text', { tabId }))).toContain('Nova fixture');
     const nav = await tool('navigate', { tabId, url: `${base}/frame.html` });
@@ -292,10 +321,13 @@ test('the model menu sets the reasoning effort sent to Nova', async () => {
 });
 
 test('full-page screenshot covers the whole page and leaves click coordinates alone', async () => {
+    // Earlier tests clear the settings, which signs out and ends the chat; hand the tab over again.
+    await page.bringToFront();
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/add-current' }));
     await page.evaluate(() => window.scrollTo(0, 0));
     const shot = await tool('computer', { tabId, action: 'screenshot', full_page: true });
     const image = shot.content.find((block) => block.type === 'image');
-    expect(image).toBeTruthy();
+    expect(image, text(shot)).toBeTruthy();
     const [, pageW, pageH] = text(shot).match(/page (\d+)x(\d+) CSS px/)!;
     const viewport = await page.evaluate(() => ({ h: window.innerHeight, scroll: document.documentElement.scrollHeight }));
     expect(Number(pageH)).toBe(viewport.scroll);
@@ -343,7 +375,7 @@ test('full-page screenshot covers the whole page and leaves click coordinates al
 });
 
 test('a screenshot in the panel opens in a zoomable viewer', async () => {
-    await panel.evaluate((baseUrl) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model' } }), `${base}/v1`);
+    await panel.evaluate((baseUrl) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model', developerTools: true } }), `${base}/v1`);
     await panel.reload();
     await panel.getByRole('button', { name: 'Tool tester' }).click();
     await panel.locator('#tool').selectOption('computer');
@@ -416,4 +448,111 @@ test('the chat list reopens and deletes saved chats', async () => {
 
     await panel.evaluate(() => chrome.storage.local.clear());
     await panel.reload();
+});
+
+test('site rules block a site and make another read-only', async () => {
+    await page.bringToFront();
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/add-current' }));
+    const tree = text(await tool('read_page', { tabId, filter: 'interactive' }));
+    const ref = refFor(tree, /button/);
+    const rules = (behavior: string) => [{ id: 'r1', pattern: '127.0.0.1', behavior }];
+    const setRules = (siteRules: unknown[]) => panel.evaluate((rules) => chrome.storage.local.set({ settings: { siteRules: rules } }), siteRules);
+
+    await setRules(rules('read-only'));
+    const readOnly = await tool('computer', { tabId, action: 'left_click', ref });
+    expect(readOnly.isError).toBe(true);
+    expect(text(readOnly)).toContain('read-only');
+    expect(text(await tool('read_page', { tabId, filter: 'interactive' }))).toContain('button');
+
+    await setRules(rules('block'));
+    const blocked = await tool('read_page', { tabId, filter: 'interactive' });
+    expect(blocked.isError).toBe(true);
+    expect(text(blocked)).toContain('site rule');
+
+    await setRules([]);
+    expect((await tool('read_page', { tabId, filter: 'interactive' })).isError).toBeFalsy();
+    await panel.evaluate(() => chrome.storage.local.clear());
+});
+
+test('the panel shows tokens and cost of a chat', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    await panel.route(`${base}/v1/**`, async (route) => {
+        if (route.request().url().endsWith('/models')) {
+            return route.fulfill({ json: { object: 'list', data: [
+                { id: 'priced', object: 'model', created: 1, owned_by: 'e2e', name: 'Priced', capabilities: ['tools'], input_cost_per_1m: 1, output_cost_per_1m: 4, currency: 'EUR' }
+            ] } });
+        }
+        requests.push(route.request().postDataJSON());
+        const text = { object: 'chat.completion.chunk', choices: [{ index: 0, delta: { content: 'Counted.' }, finish_reason: 'stop' }] };
+        const usage = { object: 'chat.completion.chunk', choices: [], usage: { prompt_tokens: 12_400, completion_tokens: 1_200 } };
+        return route.fulfill({ headers: { 'content-type': 'text/event-stream' }, body: `data: ${JSON.stringify(text)}\n\ndata: ${JSON.stringify(usage)}\n\ndata: [DONE]\n\n` });
+    });
+    await panel.evaluate((baseUrl) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'priced' } }), `${base}/v1`);
+    await panel.reload();
+    await panel.getByRole('textbox', { name: 'Message Nova' }).fill('Hi');
+    await panel.getByRole('button', { name: 'Send' }).click();
+    await expect(panel.getByText('Counted.')).toBeVisible();
+    await expect(panel.locator('.usage')).toHaveText('12.4k in · 1.2k out · €0.02');
+    expect(requests[0]).toMatchObject({ stream_options: { include_usage: true } });
+
+    await panel.unrouteAll();
+    await panel.evaluate(() => chrome.storage.local.clear());
+    await panel.reload();
+});
+
+const shortcutFixture = [{ id: 's1', name: 'news', prompt: 'Summarize the headlines', startUrl: 'https://example.org', schedule: { kind: 'off', time: '09:00', weekday: 1 } }];
+
+function mockModel(target: Page, requests: Array<Record<string, unknown>>, reply: string) {
+    return target.route(`${base}/v1/**`, async (route) => {
+        if (route.request().url().endsWith('/models')) {
+            return route.fulfill({ json: { object: 'list', data: [{ id: 'e2e-model', object: 'model', created: 1, owned_by: 'e2e', name: 'E2E', capabilities: ['tools'] }] } });
+        }
+        requests.push(route.request().postDataJSON());
+        const chunk = { object: 'chat.completion.chunk', choices: [{ index: 0, delta: { content: reply }, finish_reason: 'stop' }] };
+        return route.fulfill({ headers: { 'content-type': 'text/event-stream' }, body: `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n` });
+    });
+}
+
+test('typing /name suggests a shortcut and sends its prompt', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    await mockModel(panel, requests, 'Headlines done.');
+    await panel.evaluate(([baseUrl, shortcuts]) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model' }, shortcuts }), [`${base}/v1`, shortcutFixture] as const);
+    await panel.reload();
+
+    const box = panel.getByRole('textbox', { name: 'Message Nova' });
+    await box.fill('/ne');
+    await expect(panel.getByRole('option', { name: /\/news/ })).toBeVisible();
+    await box.press('Enter');
+    await expect(box).toHaveValue('/news ');
+    await box.fill('/news for today');
+    await panel.getByRole('button', { name: 'Send' }).click();
+    await expect(panel.getByText('Headlines done.')).toBeVisible();
+    const last = (requests[0].messages as Array<{ role: string; content: unknown }>).filter((m) => m.role === 'user').pop();
+    expect(String(last?.content)).toBe('Start by opening https://example.org.\n\nSummarize the headlines\n\nfor today');
+
+    await panel.unrouteAll();
+    await panel.evaluate(() => chrome.storage.local.clear());
+    await panel.reload();
+});
+
+test('a task window runs its shortcut at once', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    await panel.evaluate(([baseUrl, shortcuts]) => chrome.storage.local.set({ settings: { apiKey: 'e2e-key', baseUrl, model: 'e2e-model' }, shortcuts }), [`${base}/v1`, shortcutFixture] as const);
+    const task = await context.newPage();
+    await mockModel(task, requests, 'Task finished.');
+    await task.goto(`${panel.url().split('?')[0]}?task=s1`);
+    await expect(task.getByText('Task finished.')).toBeVisible();
+    expect(JSON.stringify(requests[0].messages)).toContain('Summarize the headlines');
+    await task.close();
+    await panel.evaluate(() => chrome.storage.local.clear());
+});
+
+test('scheduled shortcuts get alarms, and removing them clears the alarms', async () => {
+    const alarmNames = () => panel.evaluate(async () => (await chrome.alarms.getAll()).map((alarm) => alarm.name).filter((name) => name.startsWith('shortcut:')));
+    const scheduled = { ...shortcutFixture[0], id: 's2', name: 'daily', schedule: { kind: 'daily', time: '09:00', weekday: 1 } };
+    await panel.evaluate((shortcuts) => chrome.storage.local.set({ shortcuts }), [shortcutFixture[0], scheduled]);
+    await expect.poll(alarmNames).toEqual(['shortcut:s2']);
+    await panel.evaluate(() => chrome.storage.local.set({ shortcuts: [] }));
+    await expect.poll(alarmNames).toEqual([]);
+    await panel.evaluate(() => chrome.storage.local.clear());
 });
