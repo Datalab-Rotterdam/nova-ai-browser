@@ -79,6 +79,8 @@ test('a Nova model uses the nova-browser skill to complete a browser task', asyn
         const page = await context.newPage();
         await page.goto(`${base}/index.html`);
         await page.bringToFront();
+        // Nova starts in its own empty tab; the user hands over the fixture tab ("Use this tab").
+        await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/add-current' }));
 
         const skillRoot = join(novaHome, 'skills', 'nova-browser');
         const skillMd = readFileSync(join(skillRoot, 'SKILL.md'), 'utf8');
