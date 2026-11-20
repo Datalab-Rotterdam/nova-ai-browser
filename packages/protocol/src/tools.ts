@@ -39,7 +39,7 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     {
         name: 'tabs_context',
         readOnly: true,
-        description: 'List the tabs in the Nova tab group (id, url, title, active). Call this first: when the group does not exist yet it is created around the current tab. Only tabs in this group can be controlled.',
+        description: 'List the tabs in the Nova tab group (id, url, title, active). Call this first: when the group does not exist yet it is created with a new empty tab. Only tabs in this group can be controlled; the user\'s own tabs join only when they hand one over in the side panel ("Use this tab").',
         inputSchema: { type: 'object', properties: {} }
     },
     {
