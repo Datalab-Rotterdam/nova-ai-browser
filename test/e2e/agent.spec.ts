@@ -3,7 +3,7 @@
  * the Nova API: NOVA_E2E_AGENT=1, with a key in NOVA_API_KEY or ~/.nova-ai/credentials.json
  * (written by `nova-ai-cli --setup`). NOVA_E2E_MODEL picks the model (default: a vision model).
  */
-import { chromium, expect, test } from '@playwright/test';
+import { chromium, expect, test, type Page } from '@playwright/test';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import type { Server } from 'node:http';
 import { homedir, tmpdir } from 'node:os';
@@ -19,6 +19,12 @@ const apiKey = process.env.NOVA_API_KEY ?? (existsSync(CREDENTIALS) ? JSON.parse
 
 test.skip(!process.env.NOVA_E2E_AGENT || !apiKey, 'Set NOVA_E2E_AGENT=1 and a Nova API key to run the agent test.');
 test.setTimeout(240_000);
+
+/** Nova starts in its own empty tab; like the user pressing "Use this tab", hand it the fixture tab. */
+async function handOver(page: Page, panel: Page): Promise<void> {
+    await page.bringToFront();
+    await panel.evaluate(() => chrome.runtime.sendMessage({ type: 'tabs/add-current' }));
+}
 
 test('Nova completes a task in the fixture page from the side panel', async () => {
     const server: Server = await serveFixtures(0);
@@ -40,9 +46,8 @@ test('Nova completes a task in the fixture page from the side panel', async () =
 
         const page = await context.newPage();
         await page.goto(`${base}/index.html`);
-        await page.bringToFront();
-
         await panel.reload();
+        await handOver(page, panel);
         await panel.getByRole('textbox', { name: 'Message Nova' }).fill(
             'In the Nova fixture tab: click the Increment button 3 times, type "Ada Lovelace" in the "Your name" field and choose Green as color. Then tell me the count.');
         await panel.getByRole('button', { name: 'Send' }).click();
@@ -92,8 +97,8 @@ test('the user can steer a running task and queue a follow-up', async () => {
         }), [apiKey, process.env.NOVA_E2E_MODEL ?? 'gemma4:26b', base] as const);
         const page = await context.newPage();
         await page.goto(`${base}/index.html`);
-        await page.bringToFront();
         await panel.reload();
+        await handOver(page, panel);
 
         const box = panel.getByRole('textbox', { name: 'Message Nova' });
         await box.fill('In the Nova fixture tab, click the Increment button 4 times, one click per step. Report the count when done.');
