@@ -10,8 +10,9 @@
 //
 // Usage: node scripts/check-store-credentials.mjs
 import chromeWebstoreUpload from 'chrome-webstore-upload';
+import { readStoreEnv } from './store-env.mjs';
 
-const env = process.env;
+const env = {};
 const CHROME = ['EXTENSION_ID', 'PUBLISHER_ID', 'CLIENT_ID', 'CLIENT_SECRET', 'REFRESH_TOKEN'];
 const EDGE = ['EDGE_PRODUCT_ID', 'EDGE_CLIENT_ID', 'EDGE_API_KEY'];
 const EDGE_API = 'https://api.addons.microsoftedge.microsoft.com/v1';
@@ -23,18 +24,21 @@ const fail = (store, message) => {
     console.error(`❌ ${store}: ${message}`);
 };
 
-/** Returns false (and reports) when some but not all of a store's variables are set; null when none are. */
+/**
+ * Reads a store's variables into `env` (trimmed). Returns null when none are set, false (and reports)
+ * when some are missing or malformed, true otherwise.
+ */
 function configured(store, names) {
-    const missing = names.filter((name) => !env[name]);
+    const { values, missing, warnings, problems } = readStoreEnv(names);
+    Object.assign(env, values);
     if (missing.length === names.length) {
         console.log(`➖ ${store}: skipped, none of ${names.join(', ')} is set`);
         return null;
     }
-    if (missing.length) {
-        fail(store, `missing ${missing.join(', ')}`);
-        return false;
-    }
-    return true;
+    for (const warning of warnings) console.warn(`⚠️ ${store}: ${warning}`);
+    if (missing.length) fail(store, `missing ${missing.join(', ')}`);
+    for (const problem of problems) fail(store, problem);
+    return !missing.length && !problems.length;
 }
 
 function revision(status) {
@@ -52,11 +56,32 @@ async function checkChrome() {
         clientSecret: env.CLIENT_SECRET,
         refreshToken: env.REFRESH_TOKEN
     });
-    let token;
-    try {
-        token = await store.fetchToken();
-    } catch (error) {
-        fail('Chrome Web Store', `could not get an access token (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN): ${error.message}`);
+    // Asked directly rather than through the library, which drops Google's error_description.
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        body: new URLSearchParams({
+            client_id: env.CLIENT_ID,
+            client_secret: env.CLIENT_SECRET,
+            refresh_token: env.REFRESH_TOKEN,
+            grant_type: 'refresh_token'
+        })
+    });
+    const grant = await response.json().catch(() => ({}));
+    if (!response.ok || !grant.access_token) {
+        const google = [grant.error, grant.error_description].filter(Boolean).join(': ') || `HTTP ${response.status}`;
+        fail('Chrome Web Store', `could not get an access token: ${google}`);
+        if (grant.error === 'invalid_grant') {
+            console.error('   The client ID and secret were accepted; the refresh token was not (revoked, or made with another client).');
+            console.error('   Make a new one with this same client ID and secret.');
+        } else if (grant.error === 'invalid_client') {
+            console.error('   CLIENT_ID or CLIENT_SECRET is wrong.');
+        }
+        return;
+    }
+    const token = grant.access_token;
+    const scopes = grant.scope?.split(' ') ?? [];
+    if (grant.scope && !scopes.some((scope) => scope.startsWith('https://www.googleapis.com/auth/chromewebstore'))) {
+        fail('Chrome Web Store', `the refresh token has no Chrome Web Store scope (it has: ${grant.scope})`);
         return;
     }
     try {

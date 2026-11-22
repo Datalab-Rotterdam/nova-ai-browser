@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { readStoreEnv } from './store-env.mjs';
 
 const API = 'https://api.addons.microsoftedge.microsoft.com/v1';
 const POLL_INTERVAL_MS = 5_000;
@@ -25,14 +26,14 @@ const args = process.argv.slice(2);
 const submit = !args.includes('--no-submit');
 const zipPath = args.find((arg) => !arg.startsWith('--')) ?? join(root, 'release/nova-ai-browser-extension.zip');
 
-const { EDGE_PRODUCT_ID: productId, EDGE_CLIENT_ID: clientId, EDGE_API_KEY: apiKey } = process.env;
-const missing = Object.entries({ EDGE_PRODUCT_ID: productId, EDGE_CLIENT_ID: clientId, EDGE_API_KEY: apiKey })
-    .filter(([, value]) => !value)
-    .map(([name]) => name);
-if (missing.length) {
-    console.error(`Edge Add-ons upload needs ${missing.join(', ')}.`);
+const { values, missing, warnings, problems } = readStoreEnv(['EDGE_PRODUCT_ID', 'EDGE_CLIENT_ID', 'EDGE_API_KEY']);
+for (const warning of warnings) console.warn(`Warning: ${warning}`);
+if (missing.length || problems.length) {
+    if (missing.length) console.error(`Edge Add-ons upload needs ${missing.join(', ')}.`);
+    for (const problem of problems) console.error(problem);
     process.exit(1);
 }
+const { EDGE_PRODUCT_ID: productId, EDGE_CLIENT_ID: clientId, EDGE_API_KEY: apiKey } = values;
 
 const headers = { Authorization: `ApiKey ${apiKey}`, 'X-ClientID': clientId };
 const product = `${API}/products/${encodeURIComponent(productId)}`;
