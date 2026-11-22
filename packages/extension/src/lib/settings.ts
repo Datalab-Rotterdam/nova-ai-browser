@@ -53,6 +53,7 @@ export interface Settings {
     siteRules: SiteRule[];
     /** Notify when a scheduled task is done. */
     taskNotifications: boolean;
+    watchNotifications: boolean;
 }
 
 export const DEFAULT_BASE_URL = 'https://api.nova.datalabrotterdam.nl/v1';
@@ -72,6 +73,7 @@ export const DEFAULT_SETTINGS: Settings = {
     readOnly: false,
     siteRules: [],
     taskNotifications: true,
+    watchNotifications: true,
     acpAgents: [{ name: 'Nova AI CLI', command: 'nova-ai-cli', args: ['--acp'] }]
 };
 

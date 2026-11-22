@@ -17,12 +17,13 @@ gather information from several pages, and watch it do it with a visible cursor.
 - It asks before it uses a website for the first time, and before actions that cannot be undone.
 - You can stop it at any time, and closing the side panel ends the run.
 - Save prompts as /shortcuts and run them on a schedule.
+- Watch a page's main text or a selected value for changes while the browser is open.
 - Select text and right-click, or type `nova` in the address bar, to ask about it.
 - Open or close it from anywhere with Ctrl+E (Cmd+E on Mac).
 - Optional: let Nova AI for VS Code, nova-ai-cli, Claude Code and other agents use the same browser
   through a small local helper.
 
-Requires a Nova AI account and API key.
+AI tasks require a Nova AI account and API key. The Watchlist runs locally and is available without signing in.
 
 ## Single purpose
 
@@ -39,9 +40,9 @@ Let an AI model, chosen and authorised by the user, operate the user's browser o
 | `debugger` | Sends real clicks, keystrokes and screenshots through the Chrome DevTools Protocol so pages cannot tell them from the user's; also full-page screenshots and file uploads. Attached only to tabs Nova uses, and only during a task. |
 | `tabs` | Opens, lists and closes Nova's tabs and reads the title and address of tabs it uses. |
 | `tabGroups` | Puts Nova's tabs in their own "Nova" group. |
-| `contextMenus` | Adds "Ask Nova about this selection / page / link" to the right-click menu. |
-| `alarms` | Runs the user's own scheduled shortcuts at the time they set. |
-| `notifications` | Says when a scheduled task is done. |
+| `contextMenus` | Adds the "Ask Nova" and watch actions to the right-click menu. |
+| `alarms` | Runs scheduled shortcuts and checks content the user chose to watch. |
+| `notifications` | Says when a scheduled task is done or watched content changes. |
 | `nativeMessaging` | Optional link to the local helper that lets other AI apps use the browser. Unused when that setting is off. |
 | Host access `<all_urls>` | Nova may be asked to work on any website. It acts only on sites the user approved, and asks first. |
 | Content scripts (`http`, `https`, `file`) | The page-reading script and the visible cursor overlay. `file://` works only if the user enables file access for the extension. |

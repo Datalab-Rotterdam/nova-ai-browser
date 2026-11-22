@@ -8,9 +8,16 @@ import { nextRun } from '@datalabrotterdam/nova-ai-browser-protocol';
 import { loadSettings } from '../lib/settings';
 import { loadShortcuts, runShortcutWindow } from '../lib/shortcuts';
 import { isRunActive } from './presence';
+import { checkWatches } from './watches';
 
 const PREFIX = 'shortcut:';
 const NOTIFICATION = 'task:';
+const WATCH_ALARM = 'page-watches';
+
+// Keep the hourly watch tick alongside the scheduled shortcuts. The browser may clear alarms on restart.
+void chrome.alarms.get(WATCH_ALARM).then((alarm) => {
+    if (!alarm) return chrome.alarms.create(WATCH_ALARM, { periodInMinutes: 60 });
+}).catch(() => undefined);
 
 async function schedule(): Promise<void> {
     for (const alarm of await chrome.alarms.getAll()) {
@@ -31,6 +38,10 @@ chrome.runtime.onInstalled.addListener(() => void schedule());
 void schedule();
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name === WATCH_ALARM) {
+        await checkWatches();
+        return;
+    }
     if (!alarm.name.startsWith(PREFIX)) return;
     const id = alarm.name.slice(PREFIX.length);
     const shortcut = (await loadShortcuts()).find((candidate) => candidate.id === id);

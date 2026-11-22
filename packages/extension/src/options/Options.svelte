@@ -9,12 +9,14 @@
     import { ChatSession } from '../sidepanel/chat.svelte';
     import Settings from '../sidepanel/components/Settings.svelte';
     import Shortcuts from './Shortcuts.svelte';
+    import Watchlist from './Watchlist.svelte';
 
-    type Page = 'general' | 'shortcuts' | 'permissions' | 'agents' | 'advanced';
+    type Page = 'general' | 'shortcuts' | 'watchlist' | 'permissions' | 'agents' | 'advanced';
 
     const PAGES: Array<{ id: Page; label: string; icon: Icons; title: string; description: string }> = [
         { id: 'general', label: 'General', icon: 'sliders', title: 'General', description: 'The model Nova uses, how it reads pages and how you open it.' },
         { id: 'shortcuts', label: 'Shortcuts', icon: 'lightning-charge', title: 'Shortcuts', description: 'Saved prompts you run with /name or on a schedule.' },
+        { id: 'watchlist', label: 'Watchlist', icon: 'bell', title: 'Watchlist', description: 'Nova checks your watches about once an hour while your browser is open.' },
         { id: 'permissions', label: 'Permissions', icon: 'shield-check', title: 'Permissions', description: 'Which websites Nova may use, and when it asks.' },
         { id: 'agents', label: 'Other AI apps', icon: 'plug', title: 'Other AI apps', description: 'Let other apps use this browser through Nova.' },
         { id: 'advanced', label: 'Advanced', icon: 'gear', title: 'Advanced', description: 'Scripts, limits, the server address and developer tools.' }
@@ -39,7 +41,7 @@
     function show(next: Page) {
         welcome = false;
         page = next;
-        history.replaceState(null, '', `#${next}`);
+        history.replaceState(null, '', `${location.pathname}#${next}`);
     }
 
     void loadSettings().then((value) => {
@@ -143,12 +145,12 @@
     {/if}
 {/snippet}
 
-{#if loaded && settings.apiKey}
+{#if loaded && (settings.apiKey || page === 'watchlist')}
     <Navbar>
         <div class="crumbs"><span>Settings</span><span class="sep">/</span><strong>{current.label}</strong></div>
         {#if !$isMobile}
             <nav class="actions" aria-label="Global actions">
-                <span class="account" title="Your API key"><i class="bi bi-check-circle-fill ok" aria-hidden="true"></i>Signed in <code>{keyPreview}</code></span>
+                {#if signedIn}<span class="account" title="Your API key"><i class="bi bi-check-circle-fill ok" aria-hidden="true"></i>Signed in <code>{keyPreview}</code></span>{/if}
                 <ThemeToggler />
             </nav>
         {/if}
@@ -156,19 +158,19 @@
 
     <Sidebar bind:collapsed>
         <SidebarGroup title="Settings">
-            {#each PAGES as entry (entry.id)}
+            {#each PAGES.filter((entry) => signedIn || entry.id === 'general' || entry.id === 'watchlist') as entry (entry.id)}
                 <SidebarItem icon={entry.icon} text={entry.label} active={page === entry.id} onclick={() => show(entry.id)} hideSidebarOnMobile />
             {/each}
         </SidebarGroup>
         {#snippet footer()}
             {#if $isMobile}
                 <div class="drawer-account">
-                    <span class="account" title="Your API key"><i class="bi bi-check-circle-fill ok" aria-hidden="true"></i>Signed in <code>{keyPreview}</code></span>
+                    {#if signedIn}<span class="account" title="Your API key"><i class="bi bi-check-circle-fill ok" aria-hidden="true"></i>Signed in <code>{keyPreview}</code></span>{/if}
                     <ThemeToggler />
                 </div>
             {/if}
             <SidebarItem icon="shield-lock" text="Privacy policy" href="https://datalabrotterdam.com/privacy-policy" target="_blank" rel="noopener" />
-            <SidebarItem icon="box-arrow-right" text="Sign out" onclick={signOut} />
+            {#if signedIn}<SidebarItem icon="box-arrow-right" text="Sign out" onclick={signOut} />{/if}
         {/snippet}
     </Sidebar>
 
@@ -178,6 +180,8 @@
                 {@render welcomeCard()}
                 {#if page === 'shortcuts'}
                     <Shortcuts {settings} />
+                {:else if page === 'watchlist'}
+                    <Watchlist notifications={settings.watchNotifications} />
                 {:else}
                 <Settings {settings} models={chat.models} modelsError={chat.modelsError} onreloadmodels={() => chat.loadModels(settings)} {page} />
                 {/if}
@@ -201,6 +205,7 @@
             {@render welcomeCard()}
             {#if !welcome}
                 <Card title="Sign in" description="Open the Nova side panel and enter your API key to get started. The settings show up here afterwards." />
+                <Button variant="default" onclick={() => show('watchlist')}>Open watchlist</Button>
             {/if}
         </Page>
     </Main>
