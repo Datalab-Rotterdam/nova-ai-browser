@@ -44,9 +44,18 @@ describe.skipIf(!supported)('install (startup auto mode)', () => {
 
         const manifest = JSON.parse(readFileSync(join(edgeDir(), 'NativeMessagingHosts', `${HOST_NAME}.json`), 'utf8'));
         expect(manifest.path).toBe(join(home, '.nova-ai-browser', 'bin', 'nova-ai-browser-host'));
-        expect(manifest.allowed_origins).toEqual(['chrome-extension://lnoimoijcjpcebjepmenoepmhbdgnipo/']);
+        expect(manifest.allowed_origins).toEqual([
+            'chrome-extension://lnoimoijcjpcebjepmenoepmhbdgnipo/', // dev build
+            'chrome-extension://dpimibpmkeojokkelaeifadndbmakaik/' // Edge Add-ons
+        ]);
         // Browsers that are not installed get nothing.
         expect(existsSync(join(home, 'Library', 'Application Support', 'Google'))).toBe(false);
+    });
+
+    it('trusts only the given extension IDs when there are any', () => {
+        install({ extensionIds: ['abcdefghijklmnopabcdefghijklmnop'], userDataDirs: [], auto: true });
+        const manifest = JSON.parse(readFileSync(join(edgeDir(), 'NativeMessagingHosts', `${HOST_NAME}.json`), 'utf8'));
+        expect(manifest.allowed_origins).toEqual(['chrome-extension://abcdefghijklmnopabcdefghijklmnop/']);
     });
 
     it('changes nothing when everything is current', () => {

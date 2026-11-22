@@ -5,8 +5,20 @@ import { join } from 'node:path';
 /** Native messaging host name, registered with the browser. */
 export const HOST_NAME = 'nl.datalabrotterdam.nova_ai_browser';
 
-/** Development build ID (pinned by the manifest key). Store builds pass --extension-id. */
+/** Development build ID (pinned by the manifest key). */
 export const DEV_EXTENSION_ID = 'lnoimoijcjpcebjepmenoepmhbdgnipo';
+
+/**
+ * IDs the stores assigned to the published extension (the store build has no key, so each store
+ * picks its own). The Chrome Web Store ID goes here once it is known.
+ */
+export const STORE_EXTENSION_IDS = {
+    /** Microsoft Edge Add-ons (Partner Center, Extension identity, CRX ID). */
+    edge: 'dpimibpmkeojokkelaeifadndbmakaik'
+} as const;
+
+/** The extensions the host trusts when the installer gets no --extension-id: the dev build and the store builds. */
+export const DEFAULT_EXTENSION_IDS: readonly string[] = [DEV_EXTENSION_ID, ...Object.values(STORE_EXTENSION_IDS)];
 
 /** The Nova home shared with nova-ai-vscode and nova-ai-cli. Override with NOVA_AI_HOME. */
 export function novaHome(): string {
