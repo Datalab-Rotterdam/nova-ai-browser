@@ -53,6 +53,10 @@ Releases are cut with semantic-release on `main`; each GitHub release has the st
   uploads and submits later versions. While an earlier version is in review, the upload stays in the draft (submit it
   in Partner Center later) and the release does not fail.
 
+After changing a store secret, run the "Check store credentials" workflow (Actions, Run workflow) or
+`node scripts/check-store-credentials.mjs` with the same environment variables: it signs in and reads the store
+status without uploading anything.
+
 See `docs/STORE_LISTING.md` for the store text and `docs/PRIVACY.md` for the privacy policy.
 Status and backlog: `docs/ROADMAP.md`, `docs/PLAN.md`.
 
