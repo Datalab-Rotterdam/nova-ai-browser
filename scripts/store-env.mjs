@@ -6,6 +6,8 @@
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHAPES = {
     EXTENSION_ID: [/^[a-p]{32}$/, '32 letters a-p (the item ID in the developer dashboard URL)'],
+    CLIENT_ID: [/^\d+-[0-9a-z]+\.apps\.googleusercontent\.com$/, 'a Google OAuth client ID (<number>-<id>.apps.googleusercontent.com)'],
+    REFRESH_TOKEN: [/^1\/\//, 'a Google refresh token (starts with 1//; an authorization code starts with 4/ and cannot be used)'],
     EDGE_PRODUCT_ID: [GUID, 'a GUID (Product ID under Extension identity in Partner Center)'],
     EDGE_CLIENT_ID: [GUID, 'a GUID (Client ID under Publish API in Partner Center)']
 };
