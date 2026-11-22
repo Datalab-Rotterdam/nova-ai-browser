@@ -1,3 +1,15 @@
+# [1.7.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.6.1...v1.7.0) (2026-11-22)
+
+
+### Bug Fixes
+
+* **extension:** leave page scripts out of the store build ([ade1ec5](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/ade1ec569899b75a4c9f80ee3bc9c14f499195e9))
+
+
+### Features
+
+* **extension:** watch pages and selected text for changes ([405d847](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/405d8472427726a1620ab6ab7bef323e6df45565))
+
 ## [1.6.1](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.6.0...v1.6.1) (2026-11-20)
 
 
