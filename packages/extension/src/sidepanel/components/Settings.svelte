@@ -2,7 +2,7 @@
     import { modelCapabilities, parsePattern, SITE_RULE_BEHAVIORS, type SiteRule, type SiteRuleBehavior } from '@datalabrotterdam/nova-ai-browser-protocol';
     import type { ModelResponse } from '@datalabrotterdam/nova-sdk';
     import { DEFAULT_BASE_URL, PERMISSION_OPTIONS, saveSettings, type Settings } from '../../lib/settings';
-    import { DEV_TOOLS } from '../../lib/build';
+    import { DEV_TOOLS, PAGE_SCRIPTS } from '../../lib/build';
     import { Card, Input } from '$lib/client-lib/components';
     import Button from '$lib/client-lib/components/actions/Button.svelte';
     import ExternalAgents from './ExternalAgents.svelte';
@@ -192,8 +192,10 @@
     {:else}
         <Card title="Advanced">
 <div class="body">
-            <Input type="checkbox" name="allow-javascript" label="Let Nova run scripts on pages" description="Lets Nova do things clicking and typing cannot. Only turn this on if you trust the websites Nova visits." value={settings.allowJavascript}
-                   onchange={(e: Event) => saveSettings({ allowJavascript: (e.currentTarget as HTMLInputElement).checked })} />
+            {#if PAGE_SCRIPTS}
+                <Input type="checkbox" name="allow-javascript" label="Let Nova run scripts on pages" description="Lets Nova do things clicking and typing cannot. Only turn this on if you trust the websites Nova visits." value={settings.allowJavascript}
+                       onchange={(e: Event) => saveSettings({ allowJavascript: (e.currentTarget as HTMLInputElement).checked })} />
+            {/if}
 
             <Input type="checkbox" name="show-cursor" label="Show Nova's cursor in screenshots" value={settings.showCursorInScreenshots}
                    onchange={(e: Event) => saveSettings({ showCursorInScreenshots: (e.currentTarget as HTMLInputElement).checked })} />

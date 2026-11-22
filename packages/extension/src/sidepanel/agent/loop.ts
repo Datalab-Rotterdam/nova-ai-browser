@@ -29,6 +29,7 @@ import {
     type ToolDefinition,
     type ToolResult
 } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { PAGE_SCRIPTS } from '../../lib/build';
 import { answerText, ASK_USER, ASK_USER_TOOL, parseQuestion, type Question } from './ask';
 import { COMPACTION_PROMPT, systemPrompt } from './prompt';
 import { readOnlyRefusal } from './readonly';
@@ -106,7 +107,7 @@ export class NovaBrowserAgent {
         this.contextWindow = options.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
         // Panel-only tools come with the panel's callbacks; external agents never see them.
         this.tools = [
-            ...TOOL_DEFINITIONS,
+            ...(PAGE_SCRIPTS ? TOOL_DEFINITIONS : TOOL_DEFINITIONS.filter((tool) => tool.name !== 'javascript_tool')),
             ...(options.ask ? [ASK_USER_TOOL] : []),
             ...(options.setTodos ? [TODO_WRITE_TOOL] : [])
         ];

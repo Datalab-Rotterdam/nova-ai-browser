@@ -4,3 +4,9 @@
  * Vite inlines the mode, so the store bundle drops them entirely.
  */
 export const DEV_TOOLS = import.meta.env.MODE !== 'store';
+
+/**
+ * `javascript_tool` (and its "Let Nova run scripts on pages" setting) runs model-supplied code in a
+ * page, which the Chrome Web Store counts as remote code. The store build leaves it out entirely.
+ */
+export const PAGE_SCRIPTS = import.meta.env.MODE !== 'store';

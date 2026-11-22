@@ -1,4 +1,5 @@
 import { textResult, type ToolResult } from '@datalabrotterdam/nova-ai-browser-protocol';
+import { PAGE_SCRIPTS } from '../../lib/build';
 import { loadSettings } from '../../lib/settings';
 import { attach, clearConsole, clearNetwork, consoleEntries, networkEntries, send } from '../cdp';
 import { untrusted } from './page';
@@ -43,6 +44,9 @@ export async function readNetwork(ctx: ToolContext, args: Record<string, unknown
 }
 
 export async function javascript(ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> {
+    if (!PAGE_SCRIPTS) {
+        throw new Error('javascript_tool is not available in this version of Nova; use read_page, find or computer instead.');
+    }
     if (!(await loadSettings()).allowJavascript) {
         throw new Error('javascript_tool is disabled. The user can enable it in Nova settings; use read_page, find or computer instead.');
     }

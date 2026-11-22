@@ -49,15 +49,15 @@ Let an AI model, chosen and authorised by the user, operate the user's browser o
 ## Remote code
 
 None. All code is in the package. The model's replies are data, never executed by the extension.
-The optional "Let Nova run scripts on pages" setting (off by default) lets the model send JavaScript to a page
-through the debugger; the user turns it on knowingly.
+The store build (`--mode store`) leaves out `javascript_tool` and its "Let Nova run scripts on pages" setting,
+which would run model-supplied JavaScript in a page; only unpacked developer builds have it.
 
 ## Data usage disclosures (dashboard form)
 
 - Collected: web history and website content (pages the user lets Nova read), authentication information (API key, stored locally).
 - Used only to provide the single purpose; not sold; not used for unrelated purposes or creditworthiness.
 - Sent only to the Nova AI API the user configured.
-- Privacy policy URL: https://datalabrotterdam.com/privacy-policy (details of the extension's data handling: [PRIVACY.md](./PRIVACY.md)).
+- Privacy policy URL: https://github.com/Datalab-Rotterdam/nova-ai-browser/blob/main/docs/PRIVACY.md
 
 ## Assets to prepare
 
