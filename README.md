@@ -29,7 +29,9 @@ npm run test:e2e                                            # loads the build in
 ```
 
 Load `packages/extension/dist` with Developer mode on, "Load unpacked" in `chrome://extensions` or `edge://extensions`.
-The dev build carries a signing key so the extension id stays `lnoimoijcjpcebjepmenoepmhbdgnipo`, which the native host trusts.
+The dev build carries a signing key so the extension id stays `lnoimoijcjpcebjepmenoepmhbdgnipo`. The store builds have
+the IDs the stores assigned (Edge Add-ons: `dpimibpmkeojokkelaeifadndbmakaik`). The native host trusts all of them by
+default (`STORE_EXTENSION_IDS` in `packages/host/src/paths.ts`); `--extension-id` replaces that list.
 
 The settings page uses `client-lib`, the Nova platform's UI library, as a git submodule at
 `packages/extension/src/lib/client-lib` (public GitLab repository, licensed separately by its owner). Clone with

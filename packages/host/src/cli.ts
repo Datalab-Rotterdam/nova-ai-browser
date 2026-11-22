@@ -23,7 +23,8 @@ const HELP = `nova-ai-browser-host ${VERSION}
       --skills LIST          also install the skill for agents outside Nova: agents, claude,
                              codex, nova, all or none (comma-separated; default none, since
                              Nova apps install it from @datalabrotterdam/nova-ai-skills)
-      --extension-id ID      allow another extension ID (repeatable; default: dev build)
+      --extension-id ID      trust only these extension IDs (repeatable; default: the dev
+                             build and the store builds)
       --user-data-dir DIR    also register for a custom browser profile folder (repeatable)
       --carrier PATH         an app that runs the host itself (no Node needed); browsers
                              start PATH with the --carrier-arg values (repeatable) first

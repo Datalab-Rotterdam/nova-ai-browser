@@ -19,7 +19,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rm
 import { homedir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEV_EXTENSION_ID, ensureHomeDir, homeDir, HOST_NAME } from './paths';
+import { DEFAULT_EXTENSION_IDS, ensureHomeDir, homeDir, HOST_NAME } from './paths';
 import { VERSION } from './version';
 
 interface BrowserTarget {
@@ -372,7 +372,7 @@ export function install(options: InstallOptions): InstallResult {
     }
     changed ||= launcher.changed;
 
-    const ids = options.extensionIds.length ? options.extensionIds : [DEV_EXTENSION_ID];
+    const ids = options.extensionIds.length ? options.extensionIds : [...DEFAULT_EXTENSION_IDS];
     const body = manifest(launcher.path, ids);
     const browsers: string[] = [];
     const newBrowsers: string[] = [];
