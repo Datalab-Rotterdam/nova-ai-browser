@@ -41,10 +41,12 @@ The settings page uses `client-lib`, the Nova platform's UI library, as a git su
 npm run package:extension   # builds the store version (no dev key, no developer tools) into release/*.zip
 ```
 
-Releases are cut with semantic-release on `main`. The store uploads are opt-in through repository variables:
+Releases are cut with semantic-release on `main`; each GitHub release has the store zip attached. The store uploads are opt-in through repository variables:
 
 - Chrome Web Store: `PUBLISH_CHROME_EXTENSION=true`, secrets `CWS_EXTENSION_ID`, `CWS_PUBLISHER_ID`, `CWS_CLIENT_ID`,
-  `CWS_CLIENT_SECRET`, `CWS_REFRESH_TOKEN`.
+  `CWS_CLIENT_SECRET`, `CWS_REFRESH_TOKEN`. `npm run publish:chrome` (or `-- --no-publish` to upload only) uploads and
+  publishes. While an earlier version is in review or approved but not yet published, the upload is skipped and the
+  release does not fail; upload that release's zip in the developer dashboard afterwards.
 - Edge Add-ons: `PUBLISH_EDGE_EXTENSION=true`, secrets `EDGE_PRODUCT_ID` (the product GUID in Partner Center),
   `EDGE_CLIENT_ID` and `EDGE_API_KEY` (Partner Center, Microsoft Edge, Publish API; the key expires). The first
   version has to be published by hand in Partner Center; `npm run publish:edge` (or `-- --no-submit` for a draft only)

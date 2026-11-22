@@ -152,12 +152,11 @@ jobs:
           CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-          # The extension's store release is on hold: set the repository variable to "true" to upload again.
+          # Store uploads are opt-in: the repository variable must be "true".
           PUBLISH_CHROME_EXTENSION: ${{ vars.PUBLISH_CHROME_EXTENSION }}
           EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
           EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
           EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
-          # Same for Edge Add-ons (Partner Center): set PUBLISH_EDGE_EXTENSION to "true" to upload and submit.
           PUBLISH_EDGE_EXTENSION: ${{ vars.PUBLISH_EDGE_EXTENSION }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true

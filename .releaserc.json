@@ -30,7 +30,13 @@
       {
         "successComment": false,
         "failCommentCondition": false,
-        "releasedLabels": false
+        "releasedLabels": false,
+        "assets": [
+          {
+            "path": "release/nova-ai-browser-extension.zip",
+            "label": "Store package (Chrome Web Store, Edge Add-ons)"
+          }
+        ]
       }
     ]
   ]
