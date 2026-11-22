@@ -10,7 +10,7 @@
       "@semantic-release/exec",
       {
         "prepareCmd": "node scripts/set-version.mjs \"${nextRelease.version}\" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund && npm run package:extension && npm run build -w @datalabrotterdam/nova-ai-browser-host",
-        "publishCmd": "npm publish -w @datalabrotterdam/nova-ai-browser-host && if [ \"$PUBLISH_CHROME_EXTENSION\" = true ]; then npm run publish:chrome; else echo \"Chrome Web Store upload skipped (PUBLISH_CHROME_EXTENSION is not true)\"; fi"
+        "publishCmd": "npm publish -w @datalabrotterdam/nova-ai-browser-host && if [ \"$PUBLISH_CHROME_EXTENSION\" = true ]; then npm run publish:chrome; else echo \"Chrome Web Store upload skipped (PUBLISH_CHROME_EXTENSION is not true)\"; fi && if [ \"$PUBLISH_EDGE_EXTENSION\" = true ]; then npm run publish:edge; else echo \"Edge Add-ons upload skipped (PUBLISH_EDGE_EXTENSION is not true)\"; fi"
       }
     ],
     [

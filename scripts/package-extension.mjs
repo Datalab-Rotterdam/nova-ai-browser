@@ -1,6 +1,6 @@
-// Checks the Chrome Web Store build (packages/extension/dist-store, from `npm run build:store`)
-// and zips it into release/nova-ai-browser-extension.zip for upload. Fails on anything the store
-// would reject, so CI catches it before a release does.
+// Checks the store build (packages/extension/dist-store, from `npm run build:store`) and zips it into
+// release/nova-ai-browser-extension.zip for the Chrome Web Store and Edge Add-ons. Fails on anything
+// the stores would reject, so CI catches it before a release does.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';

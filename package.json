@@ -14,7 +14,8 @@
     "test:e2e": "npm run build && playwright test",
     "build:store": "npm run build:store -w @datalabrotterdam/nova-ai-browser-extension",
     "package:extension": "npm run build:store && node scripts/package-extension.mjs",
-    "publish:chrome": "chrome-webstore-upload --source release/nova-ai-browser-extension.zip"
+    "publish:chrome": "chrome-webstore-upload --source release/nova-ai-browser-extension.zip",
+    "publish:edge": "node scripts/publish-edge.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

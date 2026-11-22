@@ -63,4 +63,5 @@ already solves the problem rather than writing new code.
 - **External agents' tabs:** the host does not say when an MCP agent is done, so the tabs it opened stay until the panel's chat ends. A client-disconnect message from the host would let them close.
 - **Text tool calls:** text tool results are user messages, so compaction cannot shorten them (only summarize or drop). A Qwen XML parameter that is only digits arrives as a number; the tool schema could keep it text.
 - **nova-ai-vscode:** port the Qwen3-Coder XML tool-call parser (#10) to its `src/model/textToolCalls.ts`.
-- **Chrome Web Store:** the upload waits for the repository variable `PUBLISH_CHROME_EXTENSION`.
+- **Chrome Web Store / Edge Add-ons:** the uploads wait for the repository variables `PUBLISH_CHROME_EXTENSION` and
+  `PUBLISH_EDGE_EXTENSION`.
