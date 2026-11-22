@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.7.0...v1.7.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* **host:** trust the Edge Add-ons extension ID by default ([e5e79f9](https://github.com/Datalab-Rotterdam/nova-ai-browser/commit/e5e79f9206047bcf9ea43678e9331b0c301dc1c4))
+
 # [1.7.0](https://github.com/Datalab-Rotterdam/nova-ai-browser/compare/v1.6.1...v1.7.0) (2026-11-22)
 
 
