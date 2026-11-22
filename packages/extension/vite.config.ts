@@ -13,12 +13,13 @@ export default defineConfig({
         // so they share one copy of Svelte.
         preserveSymlinks: true,
         alias: [
-            { find: '$app/environment', replacement: src('./src/lib/shims/app-environment.ts') },
+            { find: /^\$app\/(environment|env)$/, replacement: src('./src/lib/shims/app-environment.ts') },
+            { find: '$app/env/public', replacement: src('./src/lib/shims/app-public-env.ts') },
             { find: '$app/state', replacement: src('./src/lib/shims/app-state.ts') },
             { find: '$app/navigation', replacement: src('./src/lib/shims/app-navigation.ts') },
             { find: '$app/forms', replacement: src('./src/lib/shims/app-forms.ts') },
             { find: '@sourceregistry/sveltekit-service-manager/client', replacement: src('./src/lib/shims/service-manager-client.ts') },
-            { find: /^\$lib\//, replacement: src('./src/lib/') }
+            { find: /^[#$]lib\//, replacement: src('./src/lib/') }
         ]
     },
     build: {

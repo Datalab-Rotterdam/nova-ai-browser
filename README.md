@@ -4,6 +4,11 @@ A Chromium extension (Chrome, Edge) that lets [Nova AI](https://nova.datalabrott
 it clicks, types and reads pages while you watch its cursor. Other agents (Nova AI for VS Code, nova-ai-cli,
 Claude Code) can use the same browser through MCP and ACP.
 
+Right-click a web page and choose **Watch this page** to track changes in its main text. Nova skips
+common navigation, banners and timestamp elements. To track a price, deadline or status, select the
+text and choose **Watch selected text**. Open **Settings → Watchlist** to check now or view changes.
+Watches run about once an hour while the browser is open and use your current browser session.
+
 ## Packages
 
 | Package | What it is |

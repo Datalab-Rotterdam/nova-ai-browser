@@ -6,10 +6,12 @@ import { forgetGeometry } from './screenshot';
 import { addTabToGroup, isInGroup, releaseGroup } from './tabs';
 import { sessionIdOf } from '../lib/sessions';
 import { onSettingsChanged } from '../lib/settings';
+import type { WatchRequest } from '../lib/watches';
 import { connectHost, disconnectHost, hostStatus, notifyHost, setToolRunner } from './native';
 import './entrypoints';
 import './schedule';
 import { blockExternalCallers, callTool } from './tools';
+import { handleWatchRequest } from './watches';
 
 const panels = new Set<chrome.runtime.Port>();
 /** The window each open panel lives in, from its hello message. */
@@ -134,9 +136,13 @@ chrome.runtime.onConnect.addListener((port) => {
 
 type ExtraRequest = { type: 'tabs/add-current' } | { type: 'tabs/release' } | { type: 'host/connect' } | { type: 'host/status' };
 
-chrome.runtime.onMessage.addListener((message: PanelRequest | OverlayEvent | ExtraRequest, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: PanelRequest | OverlayEvent | ExtraRequest | WatchRequest, sender, sendResponse) => {
     if (message?.type !== 'overlay/stop' && !fromExtensionPage(sender)) return false;
     switch (message?.type) {
+        case 'watch/check':
+        case 'watch/delete':
+            void handleWatchRequest(message).then(sendResponse);
+            return true;
         case 'host/connect':
             void disconnectHost().then(connectHost).then(() => sendResponse({ ok: true }));
             return true;

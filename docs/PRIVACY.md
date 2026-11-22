@@ -19,9 +19,11 @@ When you send a message, the extension sends this to the **Nova AI API** at the 
 - the text, structure and screenshots of the pages Nova reads or acts on for that task;
 - the results of the actions Nova takes.
 
-Nothing is sent when you are not running a task. The extension has no analytics, advertising or
-tracking, and it sends nothing to anyone except the Nova AI API address you configured. How Nova AI
-processes data on its servers is covered by the Nova AI platform's own terms and privacy policy.
+The extension sends data to the Nova AI API during AI tasks. It has no analytics, advertising or
+tracking. When you watch a page or selected text, the extension revisits the source page in your
+browser profile while the browser is open. Snapshots and change history stay in the extension and
+do not go to the Nova AI API. Browser notifications can display a preview of changes. How Nova AI
+processes data on its servers is covered by the platform's own privacy policy.
 
 ## What is stored on your device
 
@@ -29,9 +31,11 @@ In the browser's local extension storage, never synced to other devices:
 
 - your Nova API key and settings;
 - your saved chats (the last 50, without screenshots);
+- the URLs and latest snapshots of the pages or text you watch, the last check status, and up to ten changes per watch;
 - the websites you chose to always allow or block.
 
 "Sign out" removes the API key. Deleting a chat removes it. Removing the extension removes all of it.
+Removing a watch in Settings → Watchlist deletes its local history and stops future checks.
 
 ## The optional helper program
 
