@@ -10,8 +10,9 @@
 //
 // Usage: node scripts/check-store-credentials.mjs
 import chromeWebstoreUpload from 'chrome-webstore-upload';
+import { readStoreEnv } from './store-env.mjs';
 
-const env = process.env;
+const env = {};
 const CHROME = ['EXTENSION_ID', 'PUBLISHER_ID', 'CLIENT_ID', 'CLIENT_SECRET', 'REFRESH_TOKEN'];
 const EDGE = ['EDGE_PRODUCT_ID', 'EDGE_CLIENT_ID', 'EDGE_API_KEY'];
 const EDGE_API = 'https://api.addons.microsoftedge.microsoft.com/v1';
@@ -23,18 +24,21 @@ const fail = (store, message) => {
     console.error(`❌ ${store}: ${message}`);
 };
 
-/** Returns false (and reports) when some but not all of a store's variables are set; null when none are. */
+/**
+ * Reads a store's variables into `env` (trimmed). Returns null when none are set, false (and reports)
+ * when some are missing or malformed, true otherwise.
+ */
 function configured(store, names) {
-    const missing = names.filter((name) => !env[name]);
+    const { values, missing, warnings, problems } = readStoreEnv(names);
+    Object.assign(env, values);
     if (missing.length === names.length) {
         console.log(`➖ ${store}: skipped, none of ${names.join(', ')} is set`);
         return null;
     }
-    if (missing.length) {
-        fail(store, `missing ${missing.join(', ')}`);
-        return false;
-    }
-    return true;
+    for (const warning of warnings) console.warn(`⚠️ ${store}: ${warning}`);
+    if (missing.length) fail(store, `missing ${missing.join(', ')}`);
+    for (const problem of problems) fail(store, problem);
+    return !missing.length && !problems.length;
 }
 
 function revision(status) {

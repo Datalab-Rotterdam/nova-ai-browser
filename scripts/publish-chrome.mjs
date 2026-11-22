@@ -15,6 +15,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import chromeWebstoreUpload from 'chrome-webstore-upload';
+import { readStoreEnv } from './store-env.mjs';
 
 const MAX_AWAIT_UPLOAD_SECONDS = 300;
 const BLOCKING_STATES = {
@@ -27,10 +28,11 @@ const args = process.argv.slice(2);
 const publish = !args.includes('--no-publish');
 const zipPath = args.find((arg) => !arg.startsWith('--')) ?? join(root, 'release/nova-ai-browser-extension.zip');
 
-const env = process.env;
-const missing = ['EXTENSION_ID', 'PUBLISHER_ID', 'CLIENT_ID', 'CLIENT_SECRET', 'REFRESH_TOKEN'].filter((name) => !env[name]);
-if (missing.length) {
-    console.error(`Chrome Web Store upload needs ${missing.join(', ')}.`);
+const { values: env, missing, warnings, problems } = readStoreEnv(['EXTENSION_ID', 'PUBLISHER_ID', 'CLIENT_ID', 'CLIENT_SECRET', 'REFRESH_TOKEN']);
+for (const warning of warnings) console.warn(`Warning: ${warning}`);
+if (missing.length || problems.length) {
+    if (missing.length) console.error(`Chrome Web Store upload needs ${missing.join(', ')}.`);
+    for (const problem of problems) console.error(problem);
     process.exit(1);
 }
 if (!existsSync(zipPath)) {
