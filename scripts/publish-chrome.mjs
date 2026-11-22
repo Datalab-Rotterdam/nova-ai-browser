@@ -18,6 +18,8 @@ import chromeWebstoreUpload from 'chrome-webstore-upload';
 import { readStoreEnv } from './store-env.mjs';
 
 const MAX_AWAIT_UPLOAD_SECONDS = 300;
+// What the store answers to an upload or publish while a submission is in review.
+const IN_REVIEW_ERROR = /may not edit or publish an item that is in review/i;
 const BLOCKING_STATES = {
     PENDING_REVIEW: 'is still in review',
     STAGED: 'is approved and waiting to be published in the developer dashboard'
@@ -85,6 +87,15 @@ try {
         console.log(`Submitted for publishing: ${published.state ?? 'unknown state'}`);
     }
 } catch (error) {
+    // fetchStatus does not always report a submission in review (it reported none while the first
+    // version was in review), so the store's refusal counts as "in review" too.
+    if (IN_REVIEW_ERROR.test(describe(error))) {
+        console.warn(
+            `Chrome Web Store upload skipped: ${error.message} ` +
+                `Upload this release's zip in the developer dashboard once the review is done.`
+        );
+        process.exit(0);
+    }
     console.error(`Chrome Web Store upload failed:\n  - ${describe(error)}`);
     process.exit(1);
 }
