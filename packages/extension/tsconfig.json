@@ -5,8 +5,11 @@
     "types": ["chrome", "svelte", "vite/client"],
     "paths": {
       "$lib/*": ["./src/lib/*"],
+      "#lib/*": ["./src/lib/*"],
       "@sveltejs/kit": ["./src/lib/shims/sveltejs-kit.ts"],
       "$app/environment": ["./src/lib/shims/app-environment.ts"],
+      "$app/env": ["./src/lib/shims/app-environment.ts"],
+      "$app/env/public": ["./src/lib/shims/app-public-env.ts"],
       "$app/state": ["./src/lib/shims/app-state.ts"],
       "$app/navigation": ["./src/lib/shims/app-navigation.ts"],
       "$app/forms": ["./src/lib/shims/app-forms.ts"],
